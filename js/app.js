@@ -291,7 +291,7 @@ async function doFoodSearch() {
   const { results, needsKey } = await searchFood(keyword);
 
   if (needsKey) {
-    resultsEl.innerHTML = `<li>식약처 API 키가 아직 설정되지 않았어요. 키를 넣기 전까지는 아래 "직접 입력"이나 즐겨찾기를 이용해주세요.</li>`;
+    resultsEl.innerHTML = `<li>식약처 API 키가 필요해요!</li>`;
     return;
   }
   if (results.length === 0) {
