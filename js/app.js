@@ -285,20 +285,38 @@ document.getElementById("food-search").addEventListener("keydown", (e) => {
 });
 
 async function doFoodSearch() {
-  const keyword = document.getElementById("food-search").value;
+  const keyword = document.getElementById("food-search").value.trim();
   const resultsEl = document.getElementById("search-results");
   resultsEl.innerHTML = `<li>검색 중...</li>`;
-  const { results, needsKey } = await searchFood(keyword);
 
-  if (needsKey) {
-    resultsEl.innerHTML = `<li>식약처 API 키가 필요해요!</li>`;
+  // 이 API는 입력한 순서 그대로 포함되는 문자열만 찾기 때문에,
+  // "삶은 계란"처럼 입력해도 실제 음식명이 "계란_삶은것"이면 못 찾는 경우가 많아요.
+  // 그래서 띄어쓰기로 나눠서 단어별로도 순서대로 다시 시도해봐요.
+  const words = keyword.split(/\s+/).filter(Boolean);
+  const attempts = [keyword, ...words.slice().sort((a, b) => b.length - a.length)];
+  const tried = new Set();
+
+  let finalResults = [];
+  let needsKeyFlag = false;
+
+  for (const attempt of attempts) {
+    if (!attempt || tried.has(attempt)) continue;
+    tried.add(attempt);
+    const { results, needsKey } = await searchFood(attempt);
+    if (needsKey) { needsKeyFlag = true; break; }
+    if (results.length > 0) { finalResults = results; break; }
+  }
+
+  if (needsKeyFlag) {
+    resultsEl.innerHTML = `<li>식약처 API 키가 아직 설정되지 않았어요. 키를 넣기 전까지는 아래 "직접 입력"이나 즐겨찾기를 이용해주세요.</li>`;
     return;
   }
-  if (results.length === 0) {
-    resultsEl.innerHTML = `<li>검색 결과가 없어요. 직접 입력해보세요.</li>`;
+  if (finalResults.length === 0) {
+    resultsEl.innerHTML = `<li>검색 결과가 없어요. 다른 단어로 시도하거나 직접 입력해보세요.</li>`;
     return;
   }
-  resultsEl.innerHTML = results.map((r, i) => `
+
+  resultsEl.innerHTML = finalResults.map((r, i) => `
     <li data-idx="${i}">
       <span>${escapeHtml(r.name)}</span>
       <span class="sr-macro">${r.calorie}kcal/100g</span>
@@ -306,7 +324,7 @@ async function doFoodSearch() {
   `).join("");
 
   resultsEl.querySelectorAll("li[data-idx]").forEach(li => {
-    li.addEventListener("click", () => selectFood(results[Number(li.dataset.idx)]));
+    li.addEventListener("click", () => selectFood(finalResults[Number(li.dataset.idx)]));
   });
 }
 
