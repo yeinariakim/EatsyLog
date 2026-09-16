@@ -1,0 +1,21 @@
+name: Meal reminders
+
+on:
+  schedule:
+    - cron: "0 23 * * *"   # 08:00 KST — 아침
+    - cron: "30 2 * * *"   # 11:30 KST — 점심
+    - cron: "0 10 * * *"   # 19:00 KST — 저녁
+  workflow_dispatch: {}     # 수동 테스트용
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install firebase-admin
+      - run: node scripts/send-reminder.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
