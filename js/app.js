@@ -36,10 +36,16 @@ function formatDateLabel(dateStr) {
   return `${parseInt(m)}월 ${parseInt(d)}일`;
 }
 
-window.addEventListener("firebase-ready", () => {
+if (window.__eatsylog) {
+  // 이미 firebase-config.js가 먼저 끝난 경우 (이벤트를 놓쳤을 수 있으니 바로 시작)
   fb = window.__eatsylog;
   initAuth();
-});
+} else {
+  window.addEventListener("firebase-ready", () => {
+    fb = window.__eatsylog;
+    initAuth();
+  });
+}
 
 // ---------- Auth ----------
 function initAuth() {
