@@ -19,6 +19,6 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification || {};
   self.registration.showNotification(title || "eatsylog", {
     body: body || "",
-    icon: icon || undefined
+    icon: icon || "/eatsylog/icons/icon.png"
   });
 });
