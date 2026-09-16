@@ -19,7 +19,7 @@ const AMT_FIELD = {
 
 export async function searchFood(keyword, limit = 15) {
   if (!keyword.trim()) return { needsKey: false, results: [] };
-  if (API_KEY === "86bb73bbe54495f5cf722d70be2212b842691659107bf625d0f48aa34ecc2d12") {
+  if (API_KEY === "YOUR_FOODSAFETY_API_KEY") {
     console.warn("식약처 API 키가 필요해요.");
     return { needsKey: true, results: [] };
   }
