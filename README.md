@@ -27,10 +27,13 @@ Settings > Pages 에서 배포 브랜치를 설정하면 `https://yeinariakim.gi
 
 ## 3. 식약처 식품영양성분 API 키
 
-1. [data.go.kr](https://www.data.go.kr) 에서 "식품영양성분DB정보" 검색 → 활용신청 (승인까지 몇 분~몇 시간)
-2. 승인된 인증키를 `js/nutrition-api.js` 의 `API_KEY` 에 넣기
-3. **중요**: 처음 검색해보고 브라우저 개발자도구 콘솔에서 실제 응답 구조를 한 번 확인해보세요.
-   공공 API는 필드명이 바뀌는 경우가 있어서, `FIELD_MAP` 부분을 실제 응답에 맞게 조정해야 할 수도 있어요.
+1. [data.go.kr](https://www.data.go.kr/data/15127578/openapi.do) 에서 "식품의약품안전처_식품영양성분DB정보"에 활용신청 (개발단계는 자동승인)
+2. 발급받은 **일반 인증키(Decoding 값)**를 `js/nutrition-api.js` 의 `API_KEY` 에 넣기
+3. 실제 엔드포인트: `https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02`
+4. **중요**: 응답의 영양성분 값이 `AMT_NUM1`, `AMT_NUM3`처럼 번호로 된 필드라, 어떤 번호가 어떤 영양소인지는
+   반드시 상세 페이지의 "참고문서 → 출력메세지_식품영양성분DB정보.xlsx"로 확정해야 해요.
+   지금 코드는 1=에너지, 3=단백질, 4=지방, 6=탄수화물로 맞춰뒀는데, 첫 검색 결과가 이상하게 나오면
+   (예: 사과인데 단백질이 비정상적으로 높다) 캡처해서 알려주시면 바로 고쳐드릴게요.
 
 ## 4. 알림(GitHub Actions) 설정
 
