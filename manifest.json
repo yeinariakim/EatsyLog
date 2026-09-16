@@ -1,0 +1,9 @@
+{
+  "name": "eatsylog",
+  "short_name": "eatsylog",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#FAFAF8",
+  "icons": []
+}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>eatsylog</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FAFAF8">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<div id="auth-screen" class="screen">
+  <div class="auth-box">
+    <h1 class="logo">eatsylog</h1>
+    <p class="auth-sub">오늘도 잘 챙겨 먹었는지 확인해봐요</p>
+    <form id="login-form">
+      <input type="email" id="login-email" placeholder="이메일" required autocomplete="email">
+      <input type="password" id="login-password" placeholder="비밀번호" required autocomplete="current-password">
+      <button type="submit" class="btn-primary">로그인</button>
+    </form>
+    <button id="show-signup" class="btn-text">계정이 없다면 — 회원가입</button>
+    <p id="auth-error" class="auth-error"></p>
+  </div>
+</div>
+
+<div id="signup-screen" class="screen" style="display:none">
+  <div class="auth-box">
+    <h1 class="logo">eatsylog</h1>
+    <p class="auth-sub">계정을 만들어요</p>
+    <form id="signup-form">
+      <input type="email" id="signup-email" placeholder="이메일" required autocomplete="email">
+      <input type="password" id="signup-password" placeholder="비밀번호 (6자 이상)" required autocomplete="new-password" minlength="6">
+      <button type="submit" class="btn-primary">가입하고 시작하기</button>
+    </form>
+    <button id="show-login" class="btn-text">이미 계정이 있다면 — 로그인</button>
+    <p id="signup-error" class="auth-error"></p>
+  </div>
+</div>
+
+<!-- 메인 앱 -->
+<div id="app" class="screen" style="display:none">
+
+  <header class="topbar">
+    <div class="topbar-date">
+      <button id="date-prev" class="date-nav">‹</button>
+      <span id="current-date-label">오늘</span>
+      <button id="date-next" class="date-nav">›</button>
+    </div>
+    <button id="settings-btn" class="icon-btn" aria-label="목표 설정">설정</button>
+  </header>
+
+  <main id="view-home" class="view">
+    <section class="gauges">
+      <div class="gauge-item" data-metric="calorie">
+        <svg viewBox="0 0 120 120" class="gauge-ring">
+          <circle cx="60" cy="60" r="52" class="ring-track"/>
+          <circle cx="60" cy="60" r="52" class="ring-progress" data-ring="calorie"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" data-value="calorie">0</span>
+          <span class="gauge-unit">kcal</span>
+        </div>
+        <span class="gauge-label">칼로리</span>
+        <span class="gauge-goal" data-goal="calorie">/ 0</span>
+      </div>
+
+      <div class="gauge-item" data-metric="protein">
+        <svg viewBox="0 0 120 120" class="gauge-ring">
+          <circle cx="60" cy="60" r="52" class="ring-track"/>
+          <circle cx="60" cy="60" r="52" class="ring-progress" data-ring="protein"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" data-value="protein">0</span>
+          <span class="gauge-unit">g</span>
+        </div>
+        <span class="gauge-label">단백질</span>
+        <span class="gauge-goal" data-goal="protein">/ 0</span>
+      </div>
+
+      <div class="gauge-item" data-metric="carb">
+        <svg viewBox="0 0 120 120" class="gauge-ring">
+          <circle cx="60" cy="60" r="52" class="ring-track"/>
+          <circle cx="60" cy="60" r="52" class="ring-progress" data-ring="carb"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" data-value="carb">0</span>
+          <span class="gauge-unit">g</span>
+        </div>
+        <span class="gauge-label">탄수화물</span>
+        <span class="gauge-goal" data-goal="carb">/ 0 이하</span>
+      </div>
+
+      <div class="gauge-item" data-metric="fat">
+        <svg viewBox="0 0 120 120" class="gauge-ring">
+          <circle cx="60" cy="60" r="52" class="ring-track"/>
+          <circle cx="60" cy="60" r="52" class="ring-progress" data-ring="fat"/>
+        </svg>
+        <div class="gauge-text">
+          <span class="gauge-value" data-value="fat">0</span>
+          <span class="gauge-unit">g</span>
+        </div>
+        <span class="gauge-label">지방</span>
+        <span class="gauge-goal" data-goal="fat">/ 0</span>
+      </div>
+    </section>
+
+    <p id="daily-summary" class="daily-summary">기록을 시작해보세요</p>
+
+    <section class="meals">
+      <div class="meal-block" data-meal="breakfast">
+        <div class="meal-header">
+          <span class="meal-emoji">🍳</span>
+          <span class="meal-title">아침</span>
+          <button class="meal-add" data-meal="breakfast">+ 추가</button>
+        </div>
+        <ul class="food-list" data-meal-list="breakfast"></ul>
+      </div>
+
+      <div class="meal-block" data-meal="lunch">
+        <div class="meal-header">
+          <span class="meal-emoji">🥪</span>
+          <span class="meal-title">점심</span>
+          <button class="meal-add" data-meal="lunch">+ 추가</button>
+        </div>
+        <ul class="food-list" data-meal-list="lunch"></ul>
+      </div>
+
+      <div class="meal-block" data-meal="dinner">
+        <div class="meal-header">
+          <span class="meal-emoji">🌯</span>
+          <span class="meal-title">저녁</span>
+          <button class="meal-add" data-meal="dinner">+ 추가</button>
+        </div>
+        <ul class="food-list" data-meal-list="dinner"></ul>
+      </div>
+
+      <div class="meal-block" data-meal="snack">
+        <div class="meal-header">
+          <span class="meal-emoji">🍎</span>
+          <span class="meal-title">간식</span>
+          <button class="meal-add" data-meal="snack">+ 추가</button>
+        </div>
+        <ul class="food-list" data-meal-list="snack"></ul>
+      </div>
+    </section>
+  </main>
+
+  <main id="view-weight" class="view" style="display:none">
+    <h2 class="view-title">체중</h2>
+    <form id="weight-form" class="weight-form">
+      <input type="number" id="weight-input" step="0.1" placeholder="오늘 체중 (kg)" required>
+      <button type="submit" class="btn-primary">기록</button>
+    </form>
+    <div class="weight-chart-wrap">
+      <canvas id="weight-chart"></canvas>
+    </div>
+    <ul id="weight-history" class="weight-history"></ul>
+  </main>
+
+  <main id="view-trend" class="view" style="display:none">
+    <h2 class="view-title">추이</h2>
+    <div class="trend-tabs">
+      <button class="trend-tab active" data-trend="calorie">칼로리</button>
+      <button class="trend-tab" data-trend="macro">탄단지</button>
+    </div>
+    <div class="trend-chart-wrap">
+      <canvas id="trend-chart"></canvas>
+    </div>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab-btn active" data-view="home">
+      <span class="tab-icon">◎</span><span class="tab-label">홈</span>
+    </button>
+    <button class="tab-btn" data-view="weight">
+      <span class="tab-icon">▨</span><span class="tab-label">체중</span>
+    </button>
+    <button class="tab-btn" data-view="trend">
+      <span class="tab-icon">⟿</span><span class="tab-label">추이</span>
+    </button>
+  </nav>
+</div>
+
+<!-- 음식 추가 모달 -->
+<div id="food-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-meal-title">음식 추가</h3>
+      <button id="modal-close" class="icon-btn">닫기</button>
+    </div>
+
+    <div class="search-row">
+      <input type="text" id="food-search" placeholder="음식 이름 검색 (예: 닭가슴살)">
+      <button id="food-search-btn" class="btn-secondary">검색</button>
+    </div>
+    <ul id="search-results" class="search-results"></ul>
+
+    <div id="food-detail" class="food-detail" style="display:none">
+      <p class="food-detail-name" id="food-detail-name"></p>
+      <p class="food-detail-per100">100g당 <span id="food-detail-per100"></span></p>
+
+      <div class="serving-row">
+        <label>양</label>
+        <select id="serving-unit"></select>
+        <input type="number" id="serving-count" value="1" min="0.1" step="0.1">
+        <span id="serving-grams" class="serving-grams"></span>
+      </div>
+
+      <div class="computed-macros" id="computed-macros"></div>
+
+      <button id="add-food-btn" class="btn-primary">기록에 추가</button>
+    </div>
+
+    <div class="manual-entry-toggle">
+      <button id="manual-entry-btn" class="btn-text">직접 입력할래요</button>
+    </div>
+
+    <div id="manual-entry" class="manual-entry" style="display:none">
+      <input type="text" id="manual-name" placeholder="음식 이름">
+      <div class="manual-grid">
+        <input type="number" id="manual-calorie" placeholder="칼로리 (kcal)">
+        <input type="number" id="manual-protein" placeholder="단백질 (g)">
+        <input type="number" id="manual-carb" placeholder="탄수화물 (g)">
+        <input type="number" id="manual-fat" placeholder="지방 (g)">
+      </div>
+      <label class="checkbox-row"><input type="checkbox" id="manual-favorite"> 즐겨찾기에 저장</label>
+      <button id="manual-add-btn" class="btn-primary">기록에 추가</button>
+    </div>
+
+    <div class="favorites-section">
+      <p class="favorites-title">즐겨찾기</p>
+      <ul id="favorites-list" class="favorites-list"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div id="settings-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>목표 설정</h3>
+      <button id="settings-close" class="icon-btn">닫기</button>
+    </div>
+    <form id="settings-form" class="settings-form">
+      <label>칼로리 (kcal)<input type="number" id="goal-calorie" required></label>
+      <label>단백질 (g)<input type="number" id="goal-protein" required></label>
+      <label>탄수화물 상한 (g)<input type="number" id="goal-carb" required></label>
+      <label>지방 (g)<input type="number" id="goal-fat" required></label>
+      <button type="submit" class="btn-primary">저장</button>
+    </form>
+    <button id="logout-btn" class="btn-text">로그아웃</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/units.js"></script>
+<script type="module" src="js/nutrition-api.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
