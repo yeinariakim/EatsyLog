@@ -7,7 +7,7 @@
 // 3. 영양성분 필드는 AMT_NUM1(에너지), AMT_NUM3(단백질), AMT_NUM4(지방), AMT_NUM6(탄수화물)로
 //    확인 완료했어요 (실제 응답으로 칼로리=단백질*4+지방*9+탄수화물*4 검산해서 일치 확인함).
 
-const API_KEY = "86bb73bbe54495f5cf722d70be2212b842691659107bf625d0f48aa34ecc2d12";
+const API_KEY = "YOUR_FOODSAFETY_API_KEY";
 const BASE_URL = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02";
 
 const AMT_FIELD = {
@@ -20,7 +20,7 @@ const AMT_FIELD = {
 export async function searchFood(keyword, limit = 15) {
   if (!keyword.trim()) return { needsKey: false, results: [] };
   if (API_KEY === "YOUR_FOODSAFETY_API_KEY") {
-    console.warn("식약처 API 키가 필요해요.");
+    console.warn("식약처 API 키가 아직 설정되지 않았어요. js/nutrition-api.js 의 API_KEY를 채워주세요.");
     return { needsKey: true, results: [] };
   }
 
@@ -48,7 +48,9 @@ export async function searchFood(keyword, limit = 15) {
         calorie: parseFloat(row[AMT_FIELD.calorie]) || 0,
         protein: parseFloat(row[AMT_FIELD.protein]) || 0,
         fat: parseFloat(row[AMT_FIELD.fat]) || 0,
-        carb: parseFloat(row[AMT_FIELD.carb]) || 0
+        carb: parseFloat(row[AMT_FIELD.carb]) || 0,
+        // "1회 섭취참고량" — 이 음식의 표준 1회 분량 (예: "260.000g" → 260)
+        servingSizeGrams: row.Z10500 ? parseFloat(String(row.Z10500).replace(/[^\d.]/g, "")) || null : null
       }))
     };
   } catch (err) {

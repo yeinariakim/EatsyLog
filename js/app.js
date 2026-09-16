@@ -13,6 +13,7 @@ let allWeights = [];
 let allEntriesForTrend = []; // last 30 days, for the trend chart
 let pendingMeal = null;      // which meal the food modal is adding to
 let selectedFoodPer100 = null;
+let referenceServingGrams = null; // this food's own "1회 섭취참고량", if the API provided one
 let weightChart, trendChart;
 let trendMode = "calorie";
 
@@ -275,6 +276,7 @@ function resetFoodModal() {
   document.getElementById("food-detail").style.display = "none";
   document.getElementById("manual-entry").style.display = "none";
   selectedFoodPer100 = null;
+  referenceServingGrams = null;
 }
 
 document.getElementById("food-search-btn").addEventListener("click", doFoodSearch);
@@ -316,7 +318,12 @@ function selectFood(food) {
     `${food.calorie}kcal · 탄${food.carb}g 단${food.protein}g 지${food.fat}g`;
 
   const unitSelect = document.getElementById("serving-unit");
-  unitSelect.innerHTML = UNIT_PRESETS.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
+  const options = [...UNIT_PRESETS];
+  referenceServingGrams = food.servingSizeGrams || null;
+  if (referenceServingGrams) {
+    options.unshift({ id: "reference", label: `이 음식 1회 분량 (${Math.round(referenceServingGrams)}g)`, grams: referenceServingGrams });
+  }
+  unitSelect.innerHTML = options.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
   document.getElementById("serving-count").value = 1;
   updateServingPreview();
 }
@@ -324,11 +331,18 @@ function selectFood(food) {
 document.getElementById("serving-unit").addEventListener("change", updateServingPreview);
 document.getElementById("serving-count").addEventListener("input", updateServingPreview);
 
+function gramsForSelectedUnit(unitId, count) {
+  if (unitId === "reference" && referenceServingGrams) {
+    return Math.round(referenceServingGrams * count);
+  }
+  return computeGrams(unitId, count);
+}
+
 function updateServingPreview() {
   if (!selectedFoodPer100) return;
   const unitId = document.getElementById("serving-unit").value;
   const count = Number(document.getElementById("serving-count").value) || 0;
-  const grams = computeGrams(unitId, count);
+  const grams = gramsForSelectedUnit(unitId, count);
   document.getElementById("serving-grams").textContent = `≈ ${grams}g`;
   const macros = scaleNutrition(selectedFoodPer100, grams);
   document.getElementById("computed-macros").innerHTML =
@@ -339,7 +353,7 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
   if (!selectedFoodPer100) return;
   const unitId = document.getElementById("serving-unit").value;
   const count = Number(document.getElementById("serving-count").value) || 0;
-  const grams = computeGrams(unitId, count);
+  const grams = gramsForSelectedUnit(unitId, count);
   const macros = scaleNutrition(selectedFoodPer100, grams);
   await addEntry({ name: selectedFoodPer100.name, ...macros });
   closeModal("food-modal");
