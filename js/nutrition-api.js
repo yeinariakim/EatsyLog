@@ -1,46 +1,57 @@
 // nutrition-api.js
-// 식품의약품안전처 "식품영양성분DB정보" Open API 연동
-// 1. data.go.kr 에서 "식품영양성분DB정보" 검색 후 활용신청 (승인까지 보통 몇 분~몇 시간)
-// 2. 발급받은 인증키를 아래 API_KEY 에 넣으세요
-// 3. 참고: 공공 API는 가끔 응답 필드명이 바뀌므로, 실제 키로 한 번 테스트 검색을 해보고
-//    콘솔(개발자 도구)에 찍히는 raw response를 보면서 FIELD_MAP 을 맞춰야 할 수 있어요.
-//    아래 매핑은 문서 기준 일반적인 필드명으로 짜둔 것이라 100% 보장은 아니에요.
+// 식품의약품안전처 "식품영양성분DB정보" (공공데이터포털 데이터: 15127578)
+// Base URL: https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02
+//
+// 1. data.go.kr 에서 이 API에 활용신청 → "일반 인증키" 발급
+// 2. 아래 API_KEY 에 그 값을 그대로 넣으세요 (URL-encode 된 값 말고 일반 값으로)
+// 3. 응답의 영양성분 필드는 AMT_NUM1, AMT_NUM3, AMT_NUM4, AMT_NUM6 처럼 번호로 돼있는데,
+//    이 번호가 어떤 영양소인지는 "출력메세지_식품영양성분DB정보.xlsx" 참고문서로 확정되는 값이에요.
+//    아래 매핑(1=에너지, 3=단백질, 4=지방, 6=탄수화물)은 같은 API를 쓰는 다른 프로젝트들 기준으로
+//    맞춰둔 값인데, 100% 확정은 아니라서 실제 검색 결과 숫자가 이상하면(예: 사과인데 단백질이 50g)
+//    저한테 실제 응답 캡처를 보여주시면 바로 고쳐드릴게요.
 
 const API_KEY = "YOUR_FOODSAFETY_API_KEY";
-const BASE_URL = "https://openapi.foodsafetykorea.go.kr/api";
-const SERVICE_ID = "I2790"; // 식품영양성분DB정보
+const BASE_URL = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02";
 
-// 실제 응답 필드명이 다르면 이 매핑만 고치면 됩니다.
-const FIELD_MAP = {
-  name: "DESC_KOR",       // 식품명
-  calorie: "NUTR_CONT1",  // 열량 (kcal, 100g 기준)
-  carb: "NUTR_CONT2",     // 탄수화물 (g)
-  protein: "NUTR_CONT3",  // 단백질 (g)
-  fat: "NUTR_CONT4"       // 지방 (g)
+const AMT_FIELD = {
+  calorie: "AMT_NUM1",  // 에너지 (kcal)
+  protein: "AMT_NUM3",  // 단백질 (g)
+  fat: "AMT_NUM4",      // 지방 (g)
+  carb: "AMT_NUM6"      // 탄수화물 (g)
 };
 
 export async function searchFood(keyword, limit = 15) {
-  if (!keyword.trim()) return [];
+  if (!keyword.trim()) return { needsKey: false, results: [] };
   if (API_KEY === "YOUR_FOODSAFETY_API_KEY") {
     console.warn("식약처 API 키가 아직 설정되지 않았어요. js/nutrition-api.js 의 API_KEY를 채워주세요.");
     return { needsKey: true, results: [] };
   }
 
-  const url = `${BASE_URL}/${API_KEY}/${SERVICE_ID}/json/1/${limit}/DESC_KOR=${encodeURIComponent(keyword)}`;
+  const params = new URLSearchParams({
+    serviceKey: API_KEY,
+    type: "json",
+    pageNo: "1",
+    numOfRows: String(limit),
+    FOOD_NM_KR: keyword
+  });
+
+  const url = `${BASE_URL}?${params.toString()}`;
 
   try {
     const res = await fetch(url);
     const data = await res.json();
-    const rows = data?.[SERVICE_ID]?.row || [];
+
+    const items = data?.response?.body?.items?.item || [];
+    const list = Array.isArray(items) ? items : [items];
 
     return {
       needsKey: false,
-      results: rows.map(row => ({
-        name: row[FIELD_MAP.name],
-        calorie: parseFloat(row[FIELD_MAP.calorie]) || 0,
-        carb: parseFloat(row[FIELD_MAP.carb]) || 0,
-        protein: parseFloat(row[FIELD_MAP.protein]) || 0,
-        fat: parseFloat(row[FIELD_MAP.fat]) || 0
+      results: list.map(row => ({
+        name: row.FOOD_NM_KR,
+        calorie: parseFloat(row[AMT_FIELD.calorie]) || 0,
+        protein: parseFloat(row[AMT_FIELD.protein]) || 0,
+        fat: parseFloat(row[AMT_FIELD.fat]) || 0,
+        carb: parseFloat(row[AMT_FIELD.carb]) || 0
       }))
     };
   } catch (err) {
