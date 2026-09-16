@@ -29,12 +29,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDkqwEI86fHvDoJmFWsVpTZLr7rmL9j3R0",
+  authDomain: "eatsylog.firebaseapp.com",
+  projectId: "eatsylog",
+  storageBucket: "eatsylog.firebasestorage.app",
+  messagingSenderId: "1090563435414",
+  appId: "1:1090563435414:web:0f13027e6b2d0598ac8bb7"
 };
 
 const app = initializeApp(firebaseConfig);
