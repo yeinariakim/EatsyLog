@@ -50,6 +50,7 @@ if (window.__eatsylog) {
 // ---------- Auth ----------
 function initAuth() {
   fb.onAuthStateChanged(fb.auth, async (user) => {
+    document.getElementById("loading-screen").style.display = "none";
     if (user) {
       currentUser = user;
       document.getElementById("auth-screen").style.display = "none";
