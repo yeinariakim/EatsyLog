@@ -10,7 +10,7 @@
 //    맞춰둔 값인데, 100% 확정은 아니라서 실제 검색 결과 숫자가 이상하면(예: 사과인데 단백질이 50g)
 //    저한테 실제 응답 캡처를 보여주시면 바로 고쳐드릴게요.
 
-const API_KEY = "YOUR_FOODSAFETY_API_KEY";
+const API_KEY = "86bb73bbe54495f5cf722d70be2212b842691659107bf625d0f48aa34ecc2d12";
 const BASE_URL = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02";
 
 const AMT_FIELD = {
