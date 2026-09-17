@@ -3,7 +3,7 @@
 importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js");
 
-// js/firebase-config.js 와 동일한 값을 넣어주세요
+// js/firebase-config.js 와 동일한 값
 firebase.initializeApp({
   apiKey: "AIzaSyDkqwEI86fHvDoJmFWsVpTZLr7rmL9j3R0",
   authDomain: "eatsylog.firebaseapp.com",
@@ -19,6 +19,6 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification || {};
   self.registration.showNotification(title || "eatsylog", {
     body: body || "",
-    icon: icon || "/eatsylog/icons/icon.png"
+    icon: icon || "icons/icon.png"
   });
 });
