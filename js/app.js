@@ -1,5 +1,5 @@
 // app.js
-import { UNIT_PRESETS, getUnitById, computeGrams } from "./units.js";
+import { UNIT_PRESETS, getUnitById, computeGrams, guessDefaultUnit } from "./units.js";
 import { searchFood, scaleNutrition } from "./nutrition-api.js";
 import { setupNotifications } from "./notifications.js";
 
@@ -21,6 +21,45 @@ let trendMode = "calorie";
 const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
 function renderUnitOptions(selectEl, selected) {
   selectEl.innerHTML = LOG_UNITS.map(u => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("");
+}
+
+// 다이어트할 때 자주 먹는 원물·기본 식품 (100g 기준) — 검색 API에 잘 안 잡히는 것들이라
+// 검색할 때 API 결과랑 같이 합쳐서 보여줌 (app.js의 doFoodSearch 참고)
+const LOCAL_FOODS = [
+  { name: "닭가슴살(생것)", calorie: 165, protein: 31, carb: 0, fat: 3.6 },
+  { name: "닭가슴살(구운것)", calorie: 165, protein: 31, carb: 0, fat: 3.6 },
+  { name: "계란", calorie: 155, protein: 13, carb: 1.1, fat: 11 },
+  { name: "블루베리", calorie: 57, protein: 0.7, carb: 14, fat: 0.3 },
+  { name: "바나나", calorie: 89, protein: 1.1, carb: 23, fat: 0.3 },
+  { name: "사과", calorie: 52, protein: 0.3, carb: 14, fat: 0.2 },
+  { name: "아보카도", calorie: 160, protein: 2, carb: 9, fat: 15 },
+  { name: "그릭요거트(무가당)", calorie: 59, protein: 10, carb: 3.6, fat: 0.4 },
+  { name: "현미밥", calorie: 112, protein: 2.6, carb: 23.5, fat: 0.9 },
+  { name: "고구마(찐것)", calorie: 90, protein: 1.6, carb: 21, fat: 0.1 },
+  { name: "브로콜리", calorie: 34, protein: 2.8, carb: 7, fat: 0.4 },
+  { name: "아몬드", calorie: 579, protein: 21, carb: 22, fat: 50 },
+  { name: "오트밀(건조)", calorie: 389, protein: 17, carb: 66, fat: 7 },
+  { name: "두부", calorie: 76, protein: 8, carb: 1.9, fat: 4.8 },
+  { name: "연어(생것)", calorie: 208, protein: 20, carb: 0, fat: 13 },
+  { name: "방울토마토", calorie: 18, protein: 0.9, carb: 3.9, fat: 0.2 },
+  { name: "오이", calorie: 15, protein: 0.7, carb: 3.6, fat: 0.1 },
+  { name: "시금치(생것)", calorie: 23, protein: 2.9, carb: 3.6, fat: 0.4 },
+  { name: "참치캔(물에 담긴 것)", calorie: 116, protein: 26, carb: 0, fat: 1 },
+  { name: "소고기 안심(생것)", calorie: 143, protein: 21, carb: 0, fat: 6 },
+  { name: "돼지고기 안심(생것)", calorie: 143, protein: 21, carb: 0, fat: 4 },
+  { name: "프로틴쉐이크(분말)", calorie: 380, protein: 75, carb: 8, fat: 5 },
+  { name: "병아리콩(삶은것)", calorie: 164, protein: 9, carb: 27, fat: 2.6 },
+  { name: "렌틸콩(삶은것)", calorie: 116, protein: 9, carb: 20, fat: 0.4 },
+  { name: "퀴노아(조리)", calorie: 120, protein: 4.4, carb: 21, fat: 1.9 },
+  { name: "새우(생것)", calorie: 85, protein: 20, carb: 0.2, fat: 0.5 },
+  { name: "고등어(생것)", calorie: 205, protein: 19, carb: 0, fat: 14 },
+  { name: "아메리카노", calorie: 2, protein: 0.3, carb: 0, fat: 0 },
+  { name: "우유(일반)", calorie: 61, protein: 3.2, carb: 4.8, fat: 3.3 },
+  { name: "두유(무가당)", calorie: 33, protein: 3.3, carb: 1.8, fat: 1.5 }
+];
+
+function searchLocalFoods(keyword) {
+  return LOCAL_FOODS.filter(f => f.name.includes(keyword));
 }
 
 function todayStr(d = new Date()) {
@@ -316,6 +355,8 @@ async function doFoodSearch() {
   const resultsEl = document.getElementById("search-results");
   resultsEl.innerHTML = `<li>검색 중...</li>`;
 
+  const localMatches = searchLocalFoods(keyword);
+
   // 이 API는 입력한 순서 그대로 포함되는 문자열만 찾기 때문에,
   // "삶은 계란"처럼 입력해도 실제 음식명이 "계란_삶은것"이면 못 찾는 경우가 많아요.
   // 그래서 띄어쓰기로 나눠서 단어별로도 순서대로 다시 시도해봐요.
@@ -323,7 +364,7 @@ async function doFoodSearch() {
   const attempts = [keyword, ...words.slice().sort((a, b) => b.length - a.length)];
   const tried = new Set();
 
-  let finalResults = [];
+  let apiResults = [];
   let needsKeyFlag = false;
 
   for (const attempt of attempts) {
@@ -331,10 +372,13 @@ async function doFoodSearch() {
     tried.add(attempt);
     const { results, needsKey } = await searchFood(attempt);
     if (needsKey) { needsKeyFlag = true; break; }
-    if (results.length > 0) { finalResults = results; break; }
+    if (results.length > 0) { apiResults = results; break; }
   }
 
-  if (needsKeyFlag) {
+  // 로컬 목록(원물·기본 식품)을 API 결과보다 위에 먼저 보여줌
+  const finalResults = [...localMatches, ...apiResults];
+
+  if (needsKeyFlag && localMatches.length === 0) {
     resultsEl.innerHTML = `<li>식약처 API 키가 아직 설정되지 않았어요. 키를 넣기 전까지는 아래 "직접 입력"이나 즐겨찾기를 이용해주세요.</li>`;
     return;
   }
@@ -369,10 +413,10 @@ function selectFood(food) {
     options.unshift({ id: "reference", label: `이 음식 1회 분량 (${Math.round(referenceServingGrams)}g)`, grams: referenceServingGrams });
   }
   unitSelect.innerHTML = options.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
-  // API가 주는 "1회 분량"은 정보가 없을 때 그냥 100g으로 채워진 경우가 많아서,
-  // 기본값은 항상 "직접 g 입력"으로 시작해요 — 실제 양은 사용자가 정하는 게 맞아요
-  unitSelect.value = "gram";
-  document.getElementById("serving-count").value = 100;
+  // 음식 이름을 보고 실제로 많이 쓰는 단위를 기본값으로 (예: 김밥→1줄, 밥류→1공기)
+  const guess = guessDefaultUnit(food.name);
+  unitSelect.value = guess.unitId;
+  document.getElementById("serving-count").value = guess.count;
   updateServingPreview();
 }
 
