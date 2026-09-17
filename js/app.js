@@ -648,10 +648,13 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
 });
 
 // ---------- Favorites ----------
+let favoritesUnsub = null;
+
 async function loadFavorites() {
+  if (favoritesUnsub) favoritesUnsub();
   const q = fb.query(fb.collection(fb.db, "users", currentUser.uid, "favorites"), fb.orderBy("name"));
   const listEl = document.getElementById("favorites-list");
-  fb.onSnapshot(q, (snap) => {
+  favoritesUnsub = fb.onSnapshot(q, (snap) => {
     if (snap.empty) {
       listEl.innerHTML = `<li style="cursor:default">즐겨찾기한 음식이 없어요</li>`;
       return;
