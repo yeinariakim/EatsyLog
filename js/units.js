@@ -8,6 +8,7 @@ export const UNIT_PRESETS = [
   { id: "bowl_soup", label: "국/찌개 1대접", grams: 300 },
   { id: "roll_gimbap", label: "김밥 1줄", grams: 300 },
   { id: "egg", label: "계란 1개", grams: 50 },
+  { id: "fruit_piece", label: "과일 1개(중간크기)", grams: 150 },
   { id: "piece_generic", label: "1개", grams: 80 },
   { id: "cup", label: "1컵", grams: 200 },
   { id: "tbsp", label: "1큰술(스푼)", grams: 15 },
@@ -23,7 +24,8 @@ const DEFAULT_UNIT_RULES = [
   { keywords: ["볶음밥", "덮밥", "비빔밥", "밥"], unitId: "bowl_rice", count: 1 },
   { keywords: ["계란", "달걀"], unitId: "egg", count: 2 },
   { keywords: ["빵", "토스트", "샌드위치"], unitId: "slice", count: 1 },
-  { keywords: ["머핀", "마카롱", "쿠키", "베이글", "만두", "찐빵"], unitId: "piece_generic", count: 1 }
+  { keywords: ["머핀", "마카롱", "쿠키", "베이글", "만두", "찐빵"], unitId: "piece_generic", count: 1 },
+  { keywords: ["사과", "바나나", "배", "오렌지", "귤", "키위", "복숭아", "자두", "감"], unitId: "fruit_piece", count: 1 }
 ];
 
 export function guessDefaultUnit(foodName) {
