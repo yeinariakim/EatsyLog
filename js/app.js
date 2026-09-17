@@ -372,20 +372,18 @@ async function doFoodSearch() {
 
   // 이 API는 입력한 순서 그대로 포함되는 문자열만 찾기 때문에,
   // "삶은 계란"처럼 입력해도 실제 음식명이 "계란_삶은것"이면 못 찾는 경우가 많아요.
-  // 그래서 띄어쓰기로 나눠서 단어별로도 순서대로 다시 시도해봐요.
+  // 그래서 띄어쓰기로 나눠서 단어별로도 시도해보는데, 순서대로 기다리면 느려서 한꺼번에 병렬로 요청함.
   const words = keyword.split(/\s+/).filter(Boolean);
-  const attempts = [keyword, ...words.slice().sort((a, b) => b.length - a.length)];
-  const tried = new Set();
+  const attemptList = [keyword, ...words.slice().sort((a, b) => b.length - a.length)];
+  const attempts = [...new Set(attemptList.filter(Boolean))];
+
+  const settled = await Promise.all(attempts.map(attempt => searchFood(attempt)));
 
   let apiResults = [];
   let needsKeyFlag = false;
-
-  for (const attempt of attempts) {
-    if (!attempt || tried.has(attempt)) continue;
-    tried.add(attempt);
-    const { results, needsKey } = await searchFood(attempt);
-    if (needsKey) { needsKeyFlag = true; break; }
-    if (results.length > 0) { apiResults = results; break; }
+  for (const { results, needsKey } of settled) {
+    if (needsKey) needsKeyFlag = true;
+    if (results.length > 0 && apiResults.length === 0) apiResults = results;
   }
 
   // 로컬 목록(원물·기본 식품)을 API 결과보다 위에 먼저 보여줌
