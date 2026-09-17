@@ -105,7 +105,8 @@ function initAuth() {
       await loadGoals();
       subscribeToDate(currentDate);
       subscribeToWeights();
-      setupNotifications(fb.app, fb.db, fb, currentUser.uid);
+      // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
+      // 설정 화면의 "알림 켜기" 버튼으로 옮김 (아래 참고)
     } else {
       currentUser = null;
       document.getElementById("app").style.display = "none";
@@ -151,6 +152,18 @@ document.getElementById("show-login").addEventListener("click", () => {
   document.getElementById("signup-screen").style.display = "none";
   document.getElementById("auth-screen").style.display = "block";
 });
+document.getElementById("enable-notifications-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("enable-notifications-btn");
+  btn.textContent = "설정 중...";
+  try {
+    await setupNotifications(fb.app, fb.db, fb, currentUser.uid);
+    btn.textContent = "알림 켜짐 ✓";
+  } catch (err) {
+    console.error("알림 설정 실패:", err);
+    btn.textContent = `실패: ${err.message || err}`;
+  }
+});
+
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await fb.signOut(fb.auth);
   closeModal("settings-modal");
