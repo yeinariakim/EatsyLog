@@ -246,6 +246,26 @@
   </div>
 </div>
 
+<!-- 기록 수정 모달 -->
+<div id="edit-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>기록 수정</h3>
+      <button id="edit-close" class="icon-btn">닫기</button>
+    </div>
+    <form id="edit-form" class="manual-entry" style="display:flex">
+      <input type="text" id="edit-name" placeholder="음식 이름" required>
+      <div class="manual-grid">
+        <input type="number" id="edit-calorie" placeholder="칼로리 (kcal)" required>
+        <input type="number" id="edit-protein" placeholder="단백질 (g)" required>
+        <input type="number" id="edit-carb" placeholder="탄수화물 (g)" required>
+        <input type="number" id="edit-fat" placeholder="지방 (g)" required>
+      </div>
+      <button type="submit" class="btn-primary">저장</button>
+    </form>
+  </div>
+</div>
+
 <!-- 설정 모달 -->
 <div id="settings-modal" class="modal-overlay" style="display:none">
   <div class="modal">
