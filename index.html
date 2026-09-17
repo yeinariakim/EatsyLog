@@ -259,16 +259,30 @@
     </div>
     <form id="edit-form" class="manual-entry" style="display:flex">
       <input type="text" id="edit-name" placeholder="음식 이름" required>
-      <div class="amount-row">
-        <input type="number" id="edit-amount" value="1" min="0.1" step="any">
-        <select id="edit-unit"></select>
+
+      <!-- 식품 검색으로 넣은 항목: 처음 추가할 때처럼 단위+개수로 조절 -->
+      <div id="edit-serving-block" class="serving-row" style="display:none">
+        <label>양</label>
+        <select id="edit-serving-unit"></select>
+        <input type="number" id="edit-serving-count" value="1" min="0.1" step="0.1">
+        <span id="edit-serving-grams" class="serving-grams"></span>
       </div>
-      <div class="manual-grid">
-        <input type="number" id="edit-calorie" placeholder="칼로리 (kcal)" step="any" required>
-        <input type="number" id="edit-protein" placeholder="단백질 (g)" step="any" required>
-        <input type="number" id="edit-carb" placeholder="탄수화물 (g)" step="any" required>
-        <input type="number" id="edit-fat" placeholder="지방 (g)" step="any" required>
+      <div id="edit-computed-macros" class="computed-macros" style="display:none"></div>
+
+      <!-- 직접 입력한 항목: 양(개수/단위)+영양성분 숫자를 직접 -->
+      <div id="edit-manual-block" style="display:none">
+        <div class="amount-row">
+          <input type="number" id="edit-amount" value="1" min="0.1" step="any">
+          <select id="edit-unit"></select>
+        </div>
+        <div class="manual-grid">
+          <input type="number" id="edit-calorie" placeholder="칼로리 (kcal)" step="any">
+          <input type="number" id="edit-protein" placeholder="단백질 (g)" step="any">
+          <input type="number" id="edit-carb" placeholder="탄수화물 (g)" step="any">
+          <input type="number" id="edit-fat" placeholder="지방 (g)" step="any">
+        </div>
       </div>
+
       <label class="checkbox-row"><input type="checkbox" id="edit-favorite"> 즐겨찾기에 저장</label>
       <button type="submit" class="btn-primary">저장</button>
     </form>
