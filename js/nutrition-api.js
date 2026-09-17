@@ -87,7 +87,7 @@ function groupByType(results) {
     const hasRaw = items.some(i => i.dbClassCode === "01");
 
     merged.push({
-      name: `${refName} 평균값 (${n}개 평균)`,
+      name: `${refName} 평균`,
       calorie: Math.round(sum.calorie / n),
       protein: Math.round((sum.protein / n) * 10) / 10,
       fat: Math.round((sum.fat / n) * 10) / 10,
