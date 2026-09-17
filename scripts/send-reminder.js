@@ -47,7 +47,7 @@ async function main() {
 
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
-    data: { title: "eatsylog", body: message }
+    data: { title: "EatsyLog", body: message }
   });
 
   console.log(`전송 완료: 성공 ${response.successCount} / 실패 ${response.failureCount}`);
