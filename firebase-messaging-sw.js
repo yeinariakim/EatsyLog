@@ -1,24 +1,25 @@
 // firebase-messaging-sw.js
 // 이 파일은 저장소 루트에 있어야 해요 (GitHub Pages 루트 경로에서 서비스워커로 등록됨)
-importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js");
+//
+// Firebase SDK의 자동 처리(messaging.onBackgroundMessage)에 맡기지 않고,
+// 푸시 이벤트를 직접 받아서 우리가 원하는 문구 한 줄만 뜨도록 만듦.
+// (자동 처리에 맡기면 기기에 따라 "eatsylog / from eatsylog" 같은
+//  브라우저 기본 알림으로 대체되는 경우가 있어서 직접 제어하는 게 더 확실함)
 
-// js/firebase-config.js 와 동일한 값
-firebase.initializeApp({
-  apiKey: "AIzaSyDkqwEI86fHvDoJmFWsVpTZLr7rmL9j3R0",
-  authDomain: "eatsylog.firebaseapp.com",
-  projectId: "eatsylog",
-  storageBucket: "eatsylog.firebasestorage.app",
-  messagingSenderId: "1090563435414",
-  appId: "1:1090563435414:web:0f13027e6b2d0598ac8bb7"
-});
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    payload = {};
+  }
 
-const messaging = firebase.messaging();
+  const data = payload.data || payload.notification || {};
+  const body = data.body || "eatsylog";
 
-messaging.onBackgroundMessage((payload) => {
-  const { title, body, icon } = payload.notification || {};
-  self.registration.showNotification(title || "eatsylog", {
-    body: body || "",
-    icon: icon || "icons/icon.png"
-  });
+  event.waitUntil(
+    self.registration.showNotification(body, {
+      icon: "icons/icon.png"
+    })
+  );
 });
