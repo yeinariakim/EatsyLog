@@ -229,11 +229,15 @@
 
     <div id="manual-entry" class="manual-entry" style="display:none">
       <input type="text" id="manual-name" placeholder="음식 이름">
+      <div class="amount-row">
+        <input type="number" id="manual-amount" value="1" min="0.1" step="any">
+        <select id="manual-unit"></select>
+      </div>
       <div class="manual-grid">
-        <input type="number" id="manual-calorie" placeholder="칼로리 (kcal)">
-        <input type="number" id="manual-protein" placeholder="단백질 (g)">
-        <input type="number" id="manual-carb" placeholder="탄수화물 (g)">
-        <input type="number" id="manual-fat" placeholder="지방 (g)">
+        <input type="number" id="manual-calorie" placeholder="칼로리 (kcal)" step="any">
+        <input type="number" id="manual-protein" placeholder="단백질 (g)" step="any">
+        <input type="number" id="manual-carb" placeholder="탄수화물 (g)" step="any">
+        <input type="number" id="manual-fat" placeholder="지방 (g)" step="any">
       </div>
       <label class="checkbox-row"><input type="checkbox" id="manual-favorite"> 즐겨찾기에 저장</label>
       <button id="manual-add-btn" class="btn-primary">기록에 추가</button>
@@ -255,12 +259,17 @@
     </div>
     <form id="edit-form" class="manual-entry" style="display:flex">
       <input type="text" id="edit-name" placeholder="음식 이름" required>
-      <div class="manual-grid">
-        <input type="number" id="edit-calorie" placeholder="칼로리 (kcal)" required>
-        <input type="number" id="edit-protein" placeholder="단백질 (g)" required>
-        <input type="number" id="edit-carb" placeholder="탄수화물 (g)" required>
-        <input type="number" id="edit-fat" placeholder="지방 (g)" required>
+      <div class="amount-row">
+        <input type="number" id="edit-amount" value="1" min="0.1" step="any">
+        <select id="edit-unit"></select>
       </div>
+      <div class="manual-grid">
+        <input type="number" id="edit-calorie" placeholder="칼로리 (kcal)" step="any" required>
+        <input type="number" id="edit-protein" placeholder="단백질 (g)" step="any" required>
+        <input type="number" id="edit-carb" placeholder="탄수화물 (g)" step="any" required>
+        <input type="number" id="edit-fat" placeholder="지방 (g)" step="any" required>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" id="edit-favorite"> 즐겨찾기에 저장</label>
       <button type="submit" class="btn-primary">저장</button>
     </form>
   </div>
