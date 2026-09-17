@@ -180,11 +180,20 @@ function renderMeals(entries) {
     }
     list.innerHTML = items.map(item => `
       <li>
-        <span class="food-name">${escapeHtml(item.name)}</span>
-        <span class="food-macro">${item.calorie}kcal · 탄${item.carb} 단${item.protein} 지${item.fat}</span>
+        <button class="food-edit-trigger" data-edit="${item.id}">
+          <span class="food-name">${escapeHtml(item.name)}</span>
+          <span class="food-macro">${item.calorie}kcal · 탄${item.carb} 단${item.protein} 지${item.fat}</span>
+        </button>
         <button class="food-remove" data-remove="${item.id}">삭제</button>
       </li>
     `).join("");
+  });
+
+  document.querySelectorAll("[data-edit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = entries.find(e => e.id === btn.dataset.edit);
+      if (item) openEditModal(item);
+    });
   });
 
   document.querySelectorAll("[data-remove]").forEach(btn => {
@@ -275,6 +284,12 @@ function resetFoodModal() {
   document.getElementById("search-results").innerHTML = "";
   document.getElementById("food-detail").style.display = "none";
   document.getElementById("manual-entry").style.display = "none";
+  document.getElementById("manual-name").value = "";
+  document.getElementById("manual-calorie").value = "";
+  document.getElementById("manual-protein").value = "";
+  document.getElementById("manual-carb").value = "";
+  document.getElementById("manual-fat").value = "";
+  document.getElementById("manual-favorite").checked = false;
   selectedFoodPer100 = null;
   referenceServingGrams = null;
 }
@@ -409,6 +424,34 @@ async function addEntry({ name, calorie, protein, carb, fat }) {
     createdAt: fb.serverTimestamp()
   });
 }
+
+// ---------- Edit entry ----------
+let editingEntryId = null;
+
+function openEditModal(item) {
+  editingEntryId = item.id;
+  document.getElementById("edit-name").value = item.name;
+  document.getElementById("edit-calorie").value = item.calorie;
+  document.getElementById("edit-protein").value = item.protein;
+  document.getElementById("edit-carb").value = item.carb;
+  document.getElementById("edit-fat").value = item.fat;
+  openModal("edit-modal");
+}
+
+document.getElementById("edit-close").addEventListener("click", () => closeModal("edit-modal"));
+
+document.getElementById("edit-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!editingEntryId) return;
+  await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "entries", editingEntryId), {
+    name: document.getElementById("edit-name").value.trim(),
+    calorie: Number(document.getElementById("edit-calorie").value) || 0,
+    protein: Number(document.getElementById("edit-protein").value) || 0,
+    carb: Number(document.getElementById("edit-carb").value) || 0,
+    fat: Number(document.getElementById("edit-fat").value) || 0
+  }, { merge: true });
+  closeModal("edit-modal");
+});
 
 // ---------- Favorites ----------
 async function loadFavorites() {

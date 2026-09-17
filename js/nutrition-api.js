@@ -17,7 +17,7 @@ const AMT_FIELD = {
   carb: "AMT_NUM6"      // 탄수화물 (g)
 };
 
-export async function searchFood(keyword, limit = 30) {
+export async function searchFood(keyword, limit = 20) {
   if (!keyword.trim()) return { needsKey: false, results: [] };
   if (API_KEY === "YOUR_FOODSAFETY_API_KEY") {
     console.warn("식약처 API 키가 아직 설정되지 않았어요. js/nutrition-api.js 의 API_KEY를 채워주세요.");
