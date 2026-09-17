@@ -545,8 +545,12 @@ function openEditModal(item) {
 
     const unitSelect = document.getElementById("edit-serving-unit");
     unitSelect.innerHTML = UNIT_PRESETS.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
-    unitSelect.value = "gram"; // "직접 g 입력" 프리셋 — 지금 그램수를 그대로 보여주기 위해
-    document.getElementById("edit-serving-count").value = amount;
+
+    // 이 음식 이름에 맞는 단위를 기본으로 고르고, 지금 그램수에 맞춰 개수를 역산
+    const guess = guessDefaultUnit(item.name);
+    unitSelect.value = guess.unitId;
+    const unitGrams = getUnitById(guess.unitId).grams;
+    document.getElementById("edit-serving-count").value = Math.round((amount / unitGrams) * 10) / 10;
     updateEditServingPreview();
   } else {
     document.getElementById("edit-serving-block").style.display = "none";

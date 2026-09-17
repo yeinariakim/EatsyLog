@@ -7,14 +7,10 @@ export const UNIT_PRESETS = [
   { id: "bowl_rice", label: "밥 1공기", grams: 210 },
   { id: "bowl_soup", label: "국/찌개 1대접", grams: 300 },
   { id: "roll_gimbap", label: "김밥 1줄", grams: 300 },
-  { id: "plate", label: "1접시", grams: 250 },
   { id: "egg", label: "계란 1개", grams: 50 },
-  { id: "piece_meat", label: "고기 1덩이(손바닥 크기)", grams: 100 },
   { id: "piece_generic", label: "1개", grams: 80 },
   { id: "cup", label: "1컵", grams: 200 },
   { id: "tbsp", label: "1큰술(스푼)", grams: 15 },
-  { id: "tsp", label: "1작은술", grams: 5 },
-  { id: "handful", label: "1줌", grams: 30 },
   { id: "slice", label: "1조각/1장", grams: 30 },
   { id: "gram", label: "직접 g 입력", grams: 1 }
 ];
