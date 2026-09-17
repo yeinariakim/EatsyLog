@@ -17,6 +17,12 @@ let referenceServingGrams = null; // this food's own "1회 섭취참고량", if 
 let weightChart, trendChart;
 let trendMode = "calorie";
 
+// 기록에 붙이는 "양" 단위 — 그램 환산용 UNIT_PRESETS와는 별개로, 그냥 표시용 라벨이에요
+const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
+function renderUnitOptions(selectEl, selected) {
+  selectEl.innerHTML = LOG_UNITS.map(u => `<option value="${u}" ${u === selected ? "selected" : ""}>${u}</option>`).join("");
+}
+
 function todayStr(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -285,6 +291,8 @@ function resetFoodModal() {
   document.getElementById("food-detail").style.display = "none";
   document.getElementById("manual-entry").style.display = "none";
   document.getElementById("manual-name").value = "";
+  document.getElementById("manual-amount").value = "1";
+  renderUnitOptions(document.getElementById("manual-unit"), "회");
   document.getElementById("manual-calorie").value = "";
   document.getElementById("manual-protein").value = "";
   document.getElementById("manual-carb").value = "";
@@ -388,7 +396,7 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
   const count = Number(document.getElementById("serving-count").value) || 0;
   const grams = gramsForSelectedUnit(unitId, count);
   const macros = scaleNutrition(selectedFoodPer100, grams);
-  await addEntry({ name: selectedFoodPer100.name, ...macros });
+  await addEntry({ name: selectedFoodPer100.name, ...macros, amount: grams, unit: "g" });
   closeModal("food-modal");
 });
 
@@ -400,13 +408,15 @@ document.getElementById("manual-entry-btn").addEventListener("click", () => {
 
 document.getElementById("manual-add-btn").addEventListener("click", async () => {
   const name = document.getElementById("manual-name").value.trim();
+  const amount = Number(document.getElementById("manual-amount").value) || 1;
+  const unit = document.getElementById("manual-unit").value;
   const calorie = Number(document.getElementById("manual-calorie").value) || 0;
   const protein = Number(document.getElementById("manual-protein").value) || 0;
   const carb = Number(document.getElementById("manual-carb").value) || 0;
   const fat = Number(document.getElementById("manual-fat").value) || 0;
   if (!name) return;
 
-  await addEntry({ name, calorie, protein, carb, fat });
+  await addEntry({ name, calorie, protein, carb, fat, amount, unit });
 
   if (document.getElementById("manual-favorite").checked) {
     await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
@@ -416,40 +426,85 @@ document.getElementById("manual-add-btn").addEventListener("click", async () => 
   closeModal("food-modal");
 });
 
-async function addEntry({ name, calorie, protein, carb, fat }) {
+async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = "회" }) {
+  const safeAmount = amount > 0 ? amount : 1;
   await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "entries"), {
     date: currentDate,
     meal: pendingMeal,
     name, calorie, protein, carb, fat,
+    amount: safeAmount, unit,
+    perUnitCalorie: calorie / safeAmount,
+    perUnitProtein: protein / safeAmount,
+    perUnitCarb: carb / safeAmount,
+    perUnitFat: fat / safeAmount,
     createdAt: fb.serverTimestamp()
   });
 }
 
 // ---------- Edit entry ----------
 let editingEntryId = null;
+let editPerUnit = { calorie: 0, protein: 0, carb: 0, fat: 0 };
 
 function openEditModal(item) {
   editingEntryId = item.id;
+  const amount = item.amount > 0 ? item.amount : 1;
   document.getElementById("edit-name").value = item.name;
+  document.getElementById("edit-amount").value = amount;
+  renderUnitOptions(document.getElementById("edit-unit"), item.unit || "회");
   document.getElementById("edit-calorie").value = item.calorie;
   document.getElementById("edit-protein").value = item.protein;
   document.getElementById("edit-carb").value = item.carb;
   document.getElementById("edit-fat").value = item.fat;
+  document.getElementById("edit-favorite").checked = false;
+
+  // 저장된 1단위당 영양성분이 있으면 그걸 쓰고, 없으면(예전 기록) 지금 값/양으로 추정
+  editPerUnit = {
+    calorie: item.perUnitCalorie ?? item.calorie / amount,
+    protein: item.perUnitProtein ?? item.protein / amount,
+    carb: item.perUnitCarb ?? item.carb / amount,
+    fat: item.perUnitFat ?? item.fat / amount
+  };
+
   openModal("edit-modal");
 }
 
 document.getElementById("edit-close").addEventListener("click", () => closeModal("edit-modal"));
 
+// 양(amount)을 바꾸면 저장된 1단위당 영양성분 기준으로 칼로리/탄단지를 자동으로 다시 계산
+document.getElementById("edit-amount").addEventListener("input", () => {
+  const amount = Number(document.getElementById("edit-amount").value) || 0;
+  document.getElementById("edit-calorie").value = Math.round(editPerUnit.calorie * amount);
+  document.getElementById("edit-protein").value = Math.round(editPerUnit.protein * amount * 10) / 10;
+  document.getElementById("edit-carb").value = Math.round(editPerUnit.carb * amount * 10) / 10;
+  document.getElementById("edit-fat").value = Math.round(editPerUnit.fat * amount * 10) / 10;
+});
+
 document.getElementById("edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!editingEntryId) return;
+
+  const name = document.getElementById("edit-name").value.trim();
+  const amount = Number(document.getElementById("edit-amount").value) || 1;
+  const unit = document.getElementById("edit-unit").value;
+  const calorie = Number(document.getElementById("edit-calorie").value) || 0;
+  const protein = Number(document.getElementById("edit-protein").value) || 0;
+  const carb = Number(document.getElementById("edit-carb").value) || 0;
+  const fat = Number(document.getElementById("edit-fat").value) || 0;
+
   await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "entries", editingEntryId), {
-    name: document.getElementById("edit-name").value.trim(),
-    calorie: Number(document.getElementById("edit-calorie").value) || 0,
-    protein: Number(document.getElementById("edit-protein").value) || 0,
-    carb: Number(document.getElementById("edit-carb").value) || 0,
-    fat: Number(document.getElementById("edit-fat").value) || 0
+    name, amount, unit, calorie, protein, carb, fat,
+    perUnitCalorie: calorie / amount,
+    perUnitProtein: protein / amount,
+    perUnitCarb: carb / amount,
+    perUnitFat: fat / amount
   }, { merge: true });
+
+  if (document.getElementById("edit-favorite").checked) {
+    await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
+      name, calorie, protein, carb, fat
+    });
+  }
+
   closeModal("edit-modal");
 });
 
