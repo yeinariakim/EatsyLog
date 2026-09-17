@@ -501,11 +501,28 @@ input:focus { border-color: var(--accent); }
   padding: 10px 4px;
   border-bottom: 1px solid var(--line);
   font-size: 14px;
-  cursor: pointer;
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
-.favorites-list .fav-macro { color: var(--text-soft); font-size: 12px; }
+.fav-select {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font);
+  font-size: 14px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.favorites-list .fav-macro { color: var(--text-soft); font-size: 12px; white-space: nowrap; }
+.favorites-list .food-remove { flex-shrink: 0; margin-left: 8px; }
 
 .settings-form {
   display: flex;
