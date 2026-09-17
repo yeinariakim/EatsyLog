@@ -52,7 +52,7 @@ export async function searchFood(keyword, limit = 30) {
       dbClassCode: row.DB_CLASS_CM // "01" 품목대표(원재료 자체), "02" 상용제품(브랜드), "03" 외식
     }));
 
-    return { needsKey: false, results: rankResults(results, keyword) };
+    return { needsKey: false, results: withAverage(results, keyword) };
   } catch (err) {
     console.error("식품 검색 실패:", err);
     return { needsKey: false, results: [], error: true };
@@ -74,7 +74,36 @@ function rankResults(results, keyword) {
     return { item, score };
   });
   scored.sort((a, b) => a.score - b.score);
-  return scored.slice(0, 15).map(s => s.item);
+  return scored.map(s => s.item);
+}
+
+// 검색된 음식들의 평균 영양성분을 계산해서 목록 맨 위에 추가
+// (브랜드/제품별로 값이 다 달라서 대표값이 애매할 때 하나로 뭉쳐서 보여주는 용도)
+function withAverage(results, keyword) {
+  const ranked = rankResults(results, keyword);
+  if (results.length <= 1) return ranked.slice(0, 15);
+
+  const sum = results.reduce((acc, r) => {
+    acc.calorie += r.calorie;
+    acc.protein += r.protein;
+    acc.fat += r.fat;
+    acc.carb += r.carb;
+    if (r.servingSizeGrams) { acc.servingSum += r.servingSizeGrams; acc.servingCount++; }
+    return acc;
+  }, { calorie: 0, protein: 0, fat: 0, carb: 0, servingSum: 0, servingCount: 0 });
+  const n = results.length;
+
+  const average = {
+    name: `${keyword} 평균값 (관련 음식 ${n}개 평균)`,
+    calorie: Math.round(sum.calorie / n),
+    protein: Math.round((sum.protein / n) * 10) / 10,
+    fat: Math.round((sum.fat / n) * 10) / 10,
+    carb: Math.round((sum.carb / n) * 10) / 10,
+    servingSizeGrams: sum.servingCount ? Math.round(sum.servingSum / sum.servingCount) : null,
+    dbClassCode: "avg"
+  };
+
+  return [average, ...ranked.slice(0, 14)];
 }
 
 // 100g 기준 영양성분을 실제 섭취 그램수에 맞게 환산
