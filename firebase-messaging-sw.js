@@ -6,6 +6,14 @@
 // (자동 처리에 맡기면 기기에 따라 "eatsylog / from eatsylog" 같은
 //  브라우저 기본 알림으로 대체되는 경우가 있어서 직접 제어하는 게 더 확실함)
 
+// 새 서비스워커를 즉시 활성화 (예전 버전이 계속 남아있는 문제 방지)
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
