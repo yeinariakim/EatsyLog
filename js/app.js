@@ -460,7 +460,7 @@ function openEditModal(item) {
 
   if (editIsGramBased) {
     document.getElementById("edit-serving-block").style.display = "flex";
-    document.getElementById("edit-computed-macros").style.display = "flex";
+    document.getElementById("edit-computed-macros").style.display = "grid";
     document.getElementById("edit-manual-block").style.display = "none";
 
     const amount = item.amount > 0 ? item.amount : 100;
@@ -532,8 +532,10 @@ function updateEditServingPreview() {
   editComputedGrams = grams;
   document.getElementById("edit-serving-grams").textContent = `≈ ${grams}g`;
   const macros = scaleNutrition(editPer100, grams);
-  document.getElementById("edit-computed-macros").innerHTML =
-    `<span>${macros.calorie}kcal</span><span>탄 ${macros.carb}g</span><span>단 ${macros.protein}g</span><span>지 ${macros.fat}g</span>`;
+  document.getElementById("edit-serving-calorie").value = macros.calorie;
+  document.getElementById("edit-serving-protein").value = macros.protein;
+  document.getElementById("edit-serving-carb").value = macros.carb;
+  document.getElementById("edit-serving-fat").value = macros.fat;
 }
 
 document.getElementById("edit-form").addEventListener("submit", async (e) => {
@@ -546,8 +548,10 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   if (editIsGramBased) {
     amount = editComputedGrams;
     unit = "g";
-    const macros = scaleNutrition(editPer100, amount);
-    ({ calorie, protein, carb, fat } = macros);
+    calorie = Number(document.getElementById("edit-serving-calorie").value) || 0;
+    protein = Number(document.getElementById("edit-serving-protein").value) || 0;
+    carb = Number(document.getElementById("edit-serving-carb").value) || 0;
+    fat = Number(document.getElementById("edit-serving-fat").value) || 0;
   } else {
     amount = Number(document.getElementById("edit-amount").value) || 1;
     unit = document.getElementById("edit-unit").value;
