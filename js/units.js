@@ -6,9 +6,11 @@
 export const UNIT_PRESETS = [
   { id: "bowl_rice", label: "밥 1공기", grams: 210 },
   { id: "bowl_soup", label: "국/찌개 1대접", grams: 300 },
+  { id: "roll_gimbap", label: "김밥 1줄", grams: 300 },
   { id: "plate", label: "1접시", grams: 250 },
   { id: "egg", label: "계란 1개", grams: 50 },
   { id: "piece_meat", label: "고기 1덩이(손바닥 크기)", grams: 100 },
+  { id: "piece_generic", label: "1개", grams: 80 },
   { id: "cup", label: "1컵", grams: 200 },
   { id: "tbsp", label: "1큰술(스푼)", grams: 15 },
   { id: "tsp", label: "1작은술", grams: 5 },
@@ -16,6 +18,26 @@ export const UNIT_PRESETS = [
   { id: "slice", label: "1조각/1장", grams: 30 },
   { id: "gram", label: "직접 g 입력", grams: 1 }
 ];
+
+// 음식 이름을 보고 그 음식에서 실제로 많이 쓰는 단위를 기본으로 골라줌
+const DEFAULT_UNIT_RULES = [
+  { keywords: ["김밥"], unitId: "roll_gimbap", count: 1 },
+  { keywords: ["라면", "국수", "우동", "짬뽕", "파스타"], unitId: "bowl_soup", count: 1 },
+  { keywords: ["국", "찌개", "탕", "수프"], unitId: "bowl_soup", count: 1 },
+  { keywords: ["볶음밥", "덮밥", "비빔밥", "밥"], unitId: "bowl_rice", count: 1 },
+  { keywords: ["계란", "달걀"], unitId: "egg", count: 2 },
+  { keywords: ["빵", "토스트", "샌드위치"], unitId: "slice", count: 1 },
+  { keywords: ["머핀", "마카롱", "쿠키", "베이글", "만두", "찐빵"], unitId: "piece_generic", count: 1 }
+];
+
+export function guessDefaultUnit(foodName) {
+  for (const rule of DEFAULT_UNIT_RULES) {
+    if (rule.keywords.some(k => foodName.includes(k))) {
+      return { unitId: rule.unitId, count: rule.count };
+    }
+  }
+  return { unitId: "gram", count: 100 };
+}
 
 export function getUnitById(id) {
   return UNIT_PRESETS.find(u => u.id === id) || UNIT_PRESETS[UNIT_PRESETS.length - 1];
