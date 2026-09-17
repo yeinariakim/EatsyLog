@@ -298,6 +298,7 @@ input:focus { border-color: var(--accent); }
   color: inherit;
 }
 .food-list .food-name { flex: 1; }
+.food-amount { color: var(--text-soft); font-weight: 400; font-size: 0.85em; }
 .food-list .food-macro { color: var(--text-soft); font-size: 12px; white-space: nowrap; }
 .food-list .food-remove {
   background: none;
