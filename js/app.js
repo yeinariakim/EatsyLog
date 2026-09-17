@@ -369,7 +369,10 @@ function selectFood(food) {
     options.unshift({ id: "reference", label: `이 음식 1회 분량 (${Math.round(referenceServingGrams)}g)`, grams: referenceServingGrams });
   }
   unitSelect.innerHTML = options.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
-  document.getElementById("serving-count").value = 1;
+  // API가 주는 "1회 분량"은 정보가 없을 때 그냥 100g으로 채워진 경우가 많아서,
+  // 기본값은 항상 "직접 g 입력"으로 시작해요 — 실제 양은 사용자가 정하는 게 맞아요
+  unitSelect.value = "gram";
+  document.getElementById("serving-count").value = 100;
   updateServingPreview();
 }
 
@@ -390,8 +393,10 @@ function updateServingPreview() {
   const grams = gramsForSelectedUnit(unitId, count);
   document.getElementById("serving-grams").textContent = `≈ ${grams}g`;
   const macros = scaleNutrition(selectedFoodPer100, grams);
-  document.getElementById("computed-macros").innerHTML =
-    `<span>${macros.calorie}kcal</span><span>탄 ${macros.carb}g</span><span>단 ${macros.protein}g</span><span>지 ${macros.fat}g</span>`;
+  document.getElementById("computed-calorie").value = macros.calorie;
+  document.getElementById("computed-protein").value = macros.protein;
+  document.getElementById("computed-carb").value = macros.carb;
+  document.getElementById("computed-fat").value = macros.fat;
 }
 
 document.getElementById("add-food-btn").addEventListener("click", async () => {
@@ -399,8 +404,11 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
   const unitId = document.getElementById("serving-unit").value;
   const count = Number(document.getElementById("serving-count").value) || 0;
   const grams = gramsForSelectedUnit(unitId, count);
-  const macros = scaleNutrition(selectedFoodPer100, grams);
-  await addEntry({ name: selectedFoodPer100.name, ...macros, amount: grams, unit: "g" });
+  const calorie = Number(document.getElementById("computed-calorie").value) || 0;
+  const protein = Number(document.getElementById("computed-protein").value) || 0;
+  const carb = Number(document.getElementById("computed-carb").value) || 0;
+  const fat = Number(document.getElementById("computed-fat").value) || 0;
+  await addEntry({ name: selectedFoodPer100.name, calorie, protein, carb, fat, amount: grams, unit: "g" });
   closeModal("food-modal");
 });
 
@@ -591,15 +599,24 @@ async function loadFavorites() {
     snap.forEach(d => favs.push({ id: d.id, ...d.data() }));
     listEl.innerHTML = favs.map((f, i) => `
       <li data-fav-idx="${i}">
-        <span>${escapeHtml(f.name)}</span>
-        <span class="fav-macro">${f.calorie}kcal</span>
+        <button class="fav-select" data-fav-select="${i}">
+          <span>${escapeHtml(f.name)}</span>
+          <span class="fav-macro">${f.calorie}kcal</span>
+        </button>
+        <button class="food-remove" data-fav-remove="${f.id}">삭제</button>
       </li>
     `).join("");
-    listEl.querySelectorAll("li[data-fav-idx]").forEach(li => {
-      li.addEventListener("click", async () => {
-        const f = favs[Number(li.dataset.favIdx)];
+    listEl.querySelectorAll("[data-fav-select]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const f = favs[Number(btn.dataset.favSelect)];
         await addEntry({ name: f.name, calorie: f.calorie, protein: f.protein, carb: f.carb, fat: f.fat });
         closeModal("food-modal");
+      });
+    });
+    listEl.querySelectorAll("[data-fav-remove]").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await fb.deleteDoc(fb.doc(fb.db, "users", currentUser.uid, "favorites", btn.dataset.favRemove));
       });
     });
   });
