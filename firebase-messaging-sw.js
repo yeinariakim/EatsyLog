@@ -23,10 +23,12 @@ self.addEventListener("push", (event) => {
   }
 
   const data = payload.data || payload.notification || {};
-  const body = data.body || "eatsylog";
+  const title = data.title || "EatsyLog";
+  const body = data.body || "";
 
   event.waitUntil(
-    self.registration.showNotification(body, {
+    self.registration.showNotification(title, {
+      body,
       icon: "icons/icon.png"
     })
   );
