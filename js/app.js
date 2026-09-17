@@ -187,7 +187,7 @@ function renderMeals(entries) {
     list.innerHTML = items.map(item => `
       <li>
         <button class="food-edit-trigger" data-edit="${item.id}">
-          <span class="food-name">${escapeHtml(item.name)}</span>
+          <span class="food-name">${escapeHtml(item.name)}${item.amount ? ` <span class="food-amount">${formatAmount(item.amount)}${item.unit}</span>` : ""}</span>
           <span class="food-macro">${item.calorie}kcal · 탄${item.carb} 단${item.protein} 지${item.fat}</span>
         </button>
         <button class="food-remove" data-remove="${item.id}">삭제</button>
@@ -258,6 +258,10 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+function formatAmount(n) {
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10);
 }
 
 // ---------- Tabs ----------
@@ -443,34 +447,69 @@ async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = 
 
 // ---------- Edit entry ----------
 let editingEntryId = null;
-let editPerUnit = { calorie: 0, protein: 0, carb: 0, fat: 0 };
+let editPerUnit = { calorie: 0, protein: 0, carb: 0, fat: 0 }; // 직접입력 항목용
+let editPer100 = null; // 식품검색(그램 기반) 항목용 — 100g당 영양성분
+let editIsGramBased = false;
 
 function openEditModal(item) {
   editingEntryId = item.id;
-  const amount = item.amount > 0 ? item.amount : 1;
   document.getElementById("edit-name").value = item.name;
-  document.getElementById("edit-amount").value = amount;
-  renderUnitOptions(document.getElementById("edit-unit"), item.unit || "회");
-  document.getElementById("edit-calorie").value = item.calorie;
-  document.getElementById("edit-protein").value = item.protein;
-  document.getElementById("edit-carb").value = item.carb;
-  document.getElementById("edit-fat").value = item.fat;
   document.getElementById("edit-favorite").checked = false;
 
-  // 저장된 1단위당 영양성분이 있으면 그걸 쓰고, 없으면(예전 기록) 지금 값/양으로 추정
-  editPerUnit = {
-    calorie: item.perUnitCalorie ?? item.calorie / amount,
-    protein: item.perUnitProtein ?? item.protein / amount,
-    carb: item.perUnitCarb ?? item.carb / amount,
-    fat: item.perUnitFat ?? item.fat / amount
-  };
+  editIsGramBased = item.unit === "g";
+
+  if (editIsGramBased) {
+    document.getElementById("edit-serving-block").style.display = "flex";
+    document.getElementById("edit-computed-macros").style.display = "flex";
+    document.getElementById("edit-manual-block").style.display = "none";
+
+    const amount = item.amount > 0 ? item.amount : 100;
+    // 저장된 1g당 영양성분(perUnit)을 100배 해서 "100g당" 기준으로 되돌림
+    const perGram = {
+      calorie: item.perUnitCalorie ?? item.calorie / amount,
+      protein: item.perUnitProtein ?? item.protein / amount,
+      carb: item.perUnitCarb ?? item.carb / amount,
+      fat: item.perUnitFat ?? item.fat / amount
+    };
+    editPer100 = {
+      calorie: perGram.calorie * 100,
+      protein: perGram.protein * 100,
+      carb: perGram.carb * 100,
+      fat: perGram.fat * 100
+    };
+
+    const unitSelect = document.getElementById("edit-serving-unit");
+    unitSelect.innerHTML = UNIT_PRESETS.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
+    unitSelect.value = "gram"; // "직접 g 입력" 프리셋 — 지금 그램수를 그대로 보여주기 위해
+    document.getElementById("edit-serving-count").value = amount;
+    updateEditServingPreview();
+  } else {
+    document.getElementById("edit-serving-block").style.display = "none";
+    document.getElementById("edit-computed-macros").style.display = "none";
+    document.getElementById("edit-manual-block").style.display = "block";
+
+    const amount = item.amount > 0 ? item.amount : 1;
+    document.getElementById("edit-amount").value = amount;
+    renderUnitOptions(document.getElementById("edit-unit"), item.unit || "회");
+    document.getElementById("edit-calorie").value = item.calorie;
+    document.getElementById("edit-protein").value = item.protein;
+    document.getElementById("edit-carb").value = item.carb;
+    document.getElementById("edit-fat").value = item.fat;
+
+    editPerUnit = {
+      calorie: item.perUnitCalorie ?? item.calorie / amount,
+      protein: item.perUnitProtein ?? item.protein / amount,
+      carb: item.perUnitCarb ?? item.carb / amount,
+      fat: item.perUnitFat ?? item.fat / amount
+    };
+  }
 
   openModal("edit-modal");
 }
 
 document.getElementById("edit-close").addEventListener("click", () => closeModal("edit-modal"));
 
-// 양(amount)을 바꾸면 저장된 1단위당 영양성분 기준으로 칼로리/탄단지를 자동으로 다시 계산
+// 양(amount)을 바꾸면 저장된 1단위당 영양성분 기준으로 칼로리/탄단지를 자동으로 다시 계산 (직접입력 항목)
 document.getElementById("edit-amount").addEventListener("input", () => {
   const amount = Number(document.getElementById("edit-amount").value) || 0;
   document.getElementById("edit-calorie").value = Math.round(editPerUnit.calorie * amount);
@@ -479,17 +518,44 @@ document.getElementById("edit-amount").addEventListener("input", () => {
   document.getElementById("edit-fat").value = Math.round(editPerUnit.fat * amount * 10) / 10;
 });
 
+// 단위/개수를 바꾸면 100g 기준값으로 다시 계산 (식품검색으로 넣은 항목)
+document.getElementById("edit-serving-unit").addEventListener("change", updateEditServingPreview);
+document.getElementById("edit-serving-count").addEventListener("input", updateEditServingPreview);
+
+let editComputedGrams = 0;
+
+function updateEditServingPreview() {
+  if (!editPer100) return;
+  const unitId = document.getElementById("edit-serving-unit").value;
+  const count = Number(document.getElementById("edit-serving-count").value) || 0;
+  const grams = computeGrams(unitId, count);
+  editComputedGrams = grams;
+  document.getElementById("edit-serving-grams").textContent = `≈ ${grams}g`;
+  const macros = scaleNutrition(editPer100, grams);
+  document.getElementById("edit-computed-macros").innerHTML =
+    `<span>${macros.calorie}kcal</span><span>탄 ${macros.carb}g</span><span>단 ${macros.protein}g</span><span>지 ${macros.fat}g</span>`;
+}
+
 document.getElementById("edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!editingEntryId) return;
 
   const name = document.getElementById("edit-name").value.trim();
-  const amount = Number(document.getElementById("edit-amount").value) || 1;
-  const unit = document.getElementById("edit-unit").value;
-  const calorie = Number(document.getElementById("edit-calorie").value) || 0;
-  const protein = Number(document.getElementById("edit-protein").value) || 0;
-  const carb = Number(document.getElementById("edit-carb").value) || 0;
-  const fat = Number(document.getElementById("edit-fat").value) || 0;
+  let amount, unit, calorie, protein, carb, fat;
+
+  if (editIsGramBased) {
+    amount = editComputedGrams;
+    unit = "g";
+    const macros = scaleNutrition(editPer100, amount);
+    ({ calorie, protein, carb, fat } = macros);
+  } else {
+    amount = Number(document.getElementById("edit-amount").value) || 1;
+    unit = document.getElementById("edit-unit").value;
+    calorie = Number(document.getElementById("edit-calorie").value) || 0;
+    protein = Number(document.getElementById("edit-protein").value) || 0;
+    carb = Number(document.getElementById("edit-carb").value) || 0;
+    fat = Number(document.getElementById("edit-fat").value) || 0;
+  }
 
   await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "entries", editingEntryId), {
     name, amount, unit, calorie, protein, carb, fat,
