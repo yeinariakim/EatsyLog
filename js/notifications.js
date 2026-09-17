@@ -6,7 +6,7 @@
 import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging.js";
 
 // Firebase 콘솔 > 프로젝트 설정 > 클라우드 메시징 > 웹 푸시 인증서(VAPID 키)에서 발급
-const VAPID_KEY = "BPLcQ6tzyrBK0jYc625TDyqmgWxdPIMKp-HS1fWgyNUUzpG_JcNjtT-L4ENtJKNQyL_qS2jCdphx42UX8e3asGQ";
+const VAPID_KEY = "YOUR_VAPID_KEY";
 
 export async function setupNotifications(app, db, docFns, uid) {
   if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
@@ -15,7 +15,7 @@ export async function setupNotifications(app, db, docFns, uid) {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return;
 
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
     const messaging = getMessaging(app);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
 
