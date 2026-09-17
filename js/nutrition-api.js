@@ -17,10 +17,10 @@ const AMT_FIELD = {
   carb: "AMT_NUM6"      // 탄수화물 (g)
 };
 
-export async function searchFood(keyword, limit = 15) {
+export async function searchFood(keyword, limit = 30) {
   if (!keyword.trim()) return { needsKey: false, results: [] };
   if (API_KEY === "YOUR_FOODSAFETY_API_KEY") {
-    console.warn("식약처 API 키가 필요해요!");
+    console.warn("식약처 API 키가 아직 설정되지 않았어요. js/nutrition-api.js 의 API_KEY를 채워주세요.");
     return { needsKey: true, results: [] };
   }
 
@@ -41,22 +41,40 @@ export async function searchFood(keyword, limit = 15) {
     const items = data?.body?.items || [];
     const list = Array.isArray(items) ? items : [items];
 
-    return {
-      needsKey: false,
-      results: list.map(row => ({
-        name: row.FOOD_NM_KR,
-        calorie: parseFloat(row[AMT_FIELD.calorie]) || 0,
-        protein: parseFloat(row[AMT_FIELD.protein]) || 0,
-        fat: parseFloat(row[AMT_FIELD.fat]) || 0,
-        carb: parseFloat(row[AMT_FIELD.carb]) || 0,
-        // "1회 섭취참고량" — 이 음식의 표준 1회 분량 (예: "260.000g" → 260)
-        servingSizeGrams: row.Z10500 ? parseFloat(String(row.Z10500).replace(/[^\d.]/g, "")) || null : null
-      }))
-    };
+    const results = list.map(row => ({
+      name: row.FOOD_NM_KR,
+      calorie: parseFloat(row[AMT_FIELD.calorie]) || 0,
+      protein: parseFloat(row[AMT_FIELD.protein]) || 0,
+      fat: parseFloat(row[AMT_FIELD.fat]) || 0,
+      carb: parseFloat(row[AMT_FIELD.carb]) || 0,
+      // "1회 섭취참고량" — 이 음식의 표준 1회 분량 (예: "260.000g" → 260)
+      servingSizeGrams: row.Z10500 ? parseFloat(String(row.Z10500).replace(/[^\d.]/g, "")) || null : null,
+      dbClassCode: row.DB_CLASS_CM // "01" 품목대표(원재료 자체), "02" 상용제품(브랜드), "03" 외식
+    }));
+
+    return { needsKey: false, results: rankResults(results, keyword) };
   } catch (err) {
     console.error("식품 검색 실패:", err);
     return { needsKey: false, results: [], error: true };
   }
+}
+
+// 검색어와 정확히 같거나 "품목대표"(원재료 자체)인 항목을 브랜드 제품보다 위로 올림
+function rankResults(results, keyword) {
+  const scored = results.map(item => {
+    let score = 0;
+    if (item.name === keyword) score -= 100;
+    else if (item.name.startsWith(keyword)) score -= 40;
+    else if (item.name.includes(keyword)) score -= 10;
+
+    if (item.dbClassCode === "01") score -= 30;      // 품목대표
+    else if (item.dbClassCode === "02") score -= 5;  // 상용제품
+
+    score += item.name.length * 0.5; // 짧고 단순한 이름 우선
+    return { item, score };
+  });
+  scored.sort((a, b) => a.score - b.score);
+  return scored.slice(0, 15).map(s => s.item);
 }
 
 // 100g 기준 영양성분을 실제 섭취 그램수에 맞게 환산
