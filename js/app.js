@@ -14,6 +14,7 @@ let allEntriesForTrend = []; // last 30 days, for the trend chart
 let pendingMeal = null;      // which meal the food modal is adding to
 let selectedFoodPer100 = null;
 let referenceServingGrams = null; // this food's own "1회 섭취참고량", if the API provided one
+let favoritePerUnitBasis = null; // perUnit(1단위당) 즐겨찾기를 불러왔을 때, 수동입력 "양"을 바꾸면 다시 스케일링하기 위한 기준값
 let weightChart, trendChart;
 let trendMode = "calorie";
 
@@ -354,8 +355,11 @@ function resetFoodModal() {
   document.getElementById("manual-carb").value = "";
   document.getElementById("manual-fat").value = "";
   document.getElementById("manual-favorite").checked = false;
+  const foodFavCheckbox = document.getElementById("food-favorite");
+  if (foodFavCheckbox) foodFavCheckbox.checked = false;
   selectedFoodPer100 = null;
   referenceServingGrams = null;
+  favoritePerUnitBasis = null;
 }
 
 document.getElementById("food-search-btn").addEventListener("click", doFoodSearch);
@@ -410,8 +414,9 @@ async function doFoodSearch() {
   });
 }
 
-function selectFood(food) {
+function selectFood(food, opts = {}) {
   selectedFoodPer100 = food;
+  favoritePerUnitBasis = null; // 검색으로 새 음식을 고르면 이전에 불러온 즐겨찾기 기준은 무시
   document.getElementById("food-detail").style.display = "block";
   document.getElementById("food-detail-name").textContent = food.name;
   document.getElementById("food-detail-per100").textContent =
@@ -424,10 +429,16 @@ function selectFood(food) {
     options.unshift({ id: "reference", label: `이 음식 1회 분량 (${Math.round(referenceServingGrams)}g)`, grams: referenceServingGrams });
   }
   unitSelect.innerHTML = options.map(u => `<option value="${u.id}">${u.label}</option>`).join("");
-  // 음식 이름을 보고 실제로 많이 쓰는 단위를 기본값으로 (예: 김밥→1줄, 밥류→1공기)
-  const guess = guessDefaultUnit(food.name);
-  unitSelect.value = guess.unitId;
-  document.getElementById("serving-count").value = guess.count;
+  if (opts.preferReference && referenceServingGrams) {
+    // 즐겨찾기에서 불러온 경우: 예전에 먹었던 양(gram)을 그대로 "1회 분량"으로 기본 선택
+    unitSelect.value = "reference";
+    document.getElementById("serving-count").value = 1;
+  } else {
+    // 음식 이름을 보고 실제로 많이 쓰는 단위를 기본값으로 (예: 김밥→1줄, 밥류→1공기)
+    const guess = guessDefaultUnit(food.name);
+    unitSelect.value = guess.unitId;
+    document.getElementById("serving-count").value = guess.count;
+  }
   updateServingPreview();
 }
 
@@ -464,6 +475,22 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
   const carb = Number(document.getElementById("computed-carb").value) || 0;
   const fat = Number(document.getElementById("computed-fat").value) || 0;
   await addEntry({ name: selectedFoodPer100.name, calorie, protein, carb, fat, amount: grams, unit: "g" });
+
+  const foodFavCheckbox = document.getElementById("food-favorite");
+  if (foodFavCheckbox && foodFavCheckbox.checked) {
+    await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
+      name: selectedFoodPer100.name,
+      unit: "g",
+      basis: "per100",
+      per100: {
+        calorie: selectedFoodPer100.calorie,
+        protein: selectedFoodPer100.protein,
+        carb: selectedFoodPer100.carb,
+        fat: selectedFoodPer100.fat
+      },
+      defaultAmount: grams
+    });
+  }
   closeModal("food-modal");
 });
 
@@ -471,6 +498,16 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
 document.getElementById("manual-entry-btn").addEventListener("click", () => {
   const el = document.getElementById("manual-entry");
   el.style.display = el.style.display === "none" ? "flex" : "none";
+});
+
+// 즐겨찾기(perUnit 기준)를 불러온 상태에서 "양"을 바꾸면, 저장된 1단위당 값으로 다시 계산
+document.getElementById("manual-amount").addEventListener("input", () => {
+  if (!favoritePerUnitBasis) return;
+  const amount = Number(document.getElementById("manual-amount").value) || 0;
+  document.getElementById("manual-calorie").value = Math.round(favoritePerUnitBasis.calorie * amount);
+  document.getElementById("manual-protein").value = Math.round(favoritePerUnitBasis.protein * amount * 10) / 10;
+  document.getElementById("manual-carb").value = Math.round(favoritePerUnitBasis.carb * amount * 10) / 10;
+  document.getElementById("manual-fat").value = Math.round(favoritePerUnitBasis.fat * amount * 10) / 10;
 });
 
 document.getElementById("manual-add-btn").addEventListener("click", async () => {
@@ -486,8 +523,18 @@ document.getElementById("manual-add-btn").addEventListener("click", async () => 
   await addEntry({ name, calorie, protein, carb, fat, amount, unit });
 
   if (document.getElementById("manual-favorite").checked) {
+    const safeAmount = amount > 0 ? amount : 1;
     await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
-      name, calorie, protein, carb, fat
+      name,
+      unit,
+      basis: "perUnit",
+      perUnit: {
+        calorie: calorie / safeAmount,
+        protein: protein / safeAmount,
+        carb: carb / safeAmount,
+        fat: fat / safeAmount
+      },
+      defaultAmount: safeAmount
     });
   }
   closeModal("food-modal");
@@ -637,9 +684,34 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   }, { merge: true });
 
   if (document.getElementById("edit-favorite").checked) {
-    await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
-      name, calorie, protein, carb, fat
-    });
+    if (editIsGramBased) {
+      await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
+        name,
+        unit: "g",
+        basis: "per100",
+        per100: {
+          calorie: editPer100.calorie,
+          protein: editPer100.protein,
+          carb: editPer100.carb,
+          fat: editPer100.fat
+        },
+        defaultAmount: amount
+      });
+    } else {
+      const safeAmount = amount > 0 ? amount : 1;
+      await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "favorites"), {
+        name,
+        unit,
+        basis: "perUnit",
+        perUnit: {
+          calorie: calorie / safeAmount,
+          protein: protein / safeAmount,
+          carb: carb / safeAmount,
+          fat: fat / safeAmount
+        },
+        defaultAmount: safeAmount
+      });
+    }
   }
 
   closeModal("edit-modal");
@@ -647,6 +719,24 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
 
 // ---------- Favorites ----------
 let favoritesUnsub = null;
+
+// 즐겨찾기에 저장된 기준(basis)으로부터 "지난번에 먹은 양"만큼의 실제 총량을 계산
+function favoriteTotal(f) {
+  if (f.basis === "per100" && f.per100) {
+    return scaleNutrition(f.per100, f.defaultAmount || 100);
+  }
+  if (f.basis === "perUnit" && f.perUnit) {
+    const amt = f.defaultAmount || 1;
+    return {
+      calorie: Math.round(f.perUnit.calorie * amt),
+      protein: Math.round(f.perUnit.protein * amt * 10) / 10,
+      carb: Math.round(f.perUnit.carb * amt * 10) / 10,
+      fat: Math.round(f.perUnit.fat * amt * 10) / 10
+    };
+  }
+  // 구버전 즐겨찾기 (양/단위 정보 없이 저장된 것) — 그대로 표시
+  return { calorie: f.calorie, protein: f.protein, carb: f.carb, fat: f.fat };
+}
 
 async function loadFavorites() {
   if (favoritesUnsub) favoritesUnsub();
@@ -659,20 +749,49 @@ async function loadFavorites() {
     }
     const favs = [];
     snap.forEach(d => favs.push({ id: d.id, ...d.data() }));
-    listEl.innerHTML = favs.map((f, i) => `
+    listEl.innerHTML = favs.map((f, i) => {
+      const total = favoriteTotal(f);
+      const amountLabel = f.defaultAmount ? ` · ${formatAmount(f.defaultAmount)}${f.unit || ""}` : "";
+      return `
       <li data-fav-idx="${i}">
         <button class="fav-select" data-fav-select="${i}">
           <span>${escapeHtml(f.name)}</span>
-          <span class="fav-macro">${f.calorie}kcal</span>
+          <span class="fav-macro">${total.calorie}kcal${amountLabel}</span>
         </button>
         <button class="food-remove" data-fav-remove="${f.id}">삭제</button>
       </li>
-    `).join("");
+    `;
+    }).join("");
     listEl.querySelectorAll("[data-fav-select]").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const f = favs[Number(btn.dataset.favSelect)];
-        await addEntry({ name: f.name, calorie: f.calorie, protein: f.protein, carb: f.carb, fat: f.fat });
-        closeModal("food-modal");
+        if (f.basis === "per100" && f.per100) {
+          // 그램 기반 음식: 식품검색 때와 같은 "양 조절" 화면을 그대로 재사용
+          selectFood({
+            name: f.name,
+            calorie: f.per100.calorie,
+            protein: f.per100.protein,
+            carb: f.per100.carb,
+            fat: f.per100.fat,
+            servingSizeGrams: f.defaultAmount || null
+          }, { preferReference: true });
+        } else if (f.basis === "perUnit" && f.perUnit) {
+          // 개/인분/컵 등 단위 기반 음식: 직접 입력 화면에 불러와서 양만 조절
+          document.getElementById("manual-entry").style.display = "flex";
+          document.getElementById("manual-name").value = f.name;
+          renderUnitOptions(document.getElementById("manual-unit"), f.unit || "회");
+          const amt = f.defaultAmount || 1;
+          document.getElementById("manual-amount").value = amt;
+          favoritePerUnitBasis = f.perUnit;
+          document.getElementById("manual-calorie").value = Math.round(f.perUnit.calorie * amt);
+          document.getElementById("manual-protein").value = Math.round(f.perUnit.protein * amt * 10) / 10;
+          document.getElementById("manual-carb").value = Math.round(f.perUnit.carb * amt * 10) / 10;
+          document.getElementById("manual-fat").value = Math.round(f.perUnit.fat * amt * 10) / 10;
+        } else {
+          // 구버전 즐겨찾기 — 양/단위 기준이 없어서 예전처럼 1회로 바로 추가
+          addEntry({ name: f.name, calorie: f.calorie, protein: f.protein, carb: f.carb, fat: f.fat });
+          closeModal("food-modal");
+        }
       });
     });
     listEl.querySelectorAll("[data-fav-remove]").forEach(btn => {
