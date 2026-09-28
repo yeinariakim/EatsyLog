@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260929d">
+<link rel="stylesheet" href="css/style.css?v=20260930a">
 </head>
 <body>
 
@@ -244,6 +244,16 @@
     <div class="cal-legend">
       <span><i class="cal-dot done"></i>목표 달성 (목표 이하)</span>
       <span><i class="cal-dot over"></i>목표 초과</span>
+    </div>
+    <p class="cal-hint">기록 못 한 날은 길게 눌러서 성공/실패를 직접 표시할 수 있어요</p>
+    <!-- 달력 수동 기록 선택창 (길게 누른 칸 옆에 작게 뜸) -->
+    <div id="manual-day-backdrop" class="manual-day-backdrop" style="display:none"></div>
+    <div id="manual-day-popup" class="manual-day-popup" role="dialog" aria-label="수동 기록" style="display:none">
+      <p id="manual-day-label" class="manual-day-label"></p>
+      <div class="manual-day-actions">
+        <button type="button" class="manual-day-btn success" data-manual-status="success">성공</button>
+        <button type="button" class="manual-day-btn fail" data-manual-status="fail">실패</button>
+      </div>
     </div>
   </main>
 
@@ -504,6 +514,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260929d"></script>
+<script type="module" src="js/app.js?v=20260930a"></script>
 </body>
 </html>

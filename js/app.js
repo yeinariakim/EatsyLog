@@ -19,6 +19,8 @@ let favoriteExtrasBasisAmount = null; // 위 extras가 원래 몇 그램/몇 개
 let calendarUnsub = null;
 let calendarMonth = currentDate.slice(0, 7); // 달력에 보이는 달 "YYYY-MM"
 let calendarTotals = {};                      // 그 달의 { "YYYY-MM-DD": 칼로리 합계 } (기록 있는 날만)
+let calendarManualUnsub = null;
+let calendarManual = {};                      // 그 달의 수동 기록 { "YYYY-MM-DD": "success" | "fail" }
 let workoutsUnsub = null;
 let allWorkouts = [];      // 운동 기록 전체 (날짜별 목록 + 종목별 무게 추이에 같이 씀)
 let inbodyUnsub = null;
@@ -258,6 +260,8 @@ function initAuth() {
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
       if (workoutFavsUnsub) { workoutFavsUnsub(); workoutFavsUnsub = null; }
       if (calendarUnsub) { calendarUnsub(); calendarUnsub = null; }
+      if (calendarManualUnsub) { calendarManualUnsub(); calendarManualUnsub = null; }
+      closeManualDayPopup();
       switchView("home"); // 다음에 로그인하면 홈부터 보이도록
     }
   });
@@ -871,6 +875,9 @@ async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = 
     extras,
     createdAt: fb.serverTimestamp()
   });
+  // 달력에서 수동으로 성공/실패를 표시해 둔 날이면, 실제 기록이 생겼으니 수동 표시는 지움
+  // (없는 문서를 지워도 오류가 아님. 실패해도 음식 추가는 이미 끝났으니 경고만 남김)
+  fb.deleteDoc(manualDayRef(currentDate)).catch(err => console.warn("수동 기록 삭제 실패", err));
 }
 
 // ---------- Edit entry ----------
@@ -2287,13 +2294,18 @@ function daysInMonth(ym) {
 
 function subscribeToCalendarMonth() {
   if (calendarUnsub) calendarUnsub();
+  if (calendarManualUnsub) calendarManualUnsub();
+  closeManualDayPopup();
   calendarTotals = {};
+  calendarManual = {};
   renderCalendar();
   const month = calendarMonth;
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(daysInMonth(month)).padStart(2, "0")}`;
   const q = fb.query(
     fb.collection(fb.db, "users", currentUser.uid, "entries"),
-    fb.where("date", ">=", `${month}-01`),
-    fb.where("date", "<=", `${month}-${String(daysInMonth(month)).padStart(2, "0")}`)
+    fb.where("date", ">=", monthStart),
+    fb.where("date", "<=", monthEnd)
   );
   calendarUnsub = fb.onSnapshot(q, (snap) => {
     const totals = {};
@@ -2304,6 +2316,21 @@ function subscribeToCalendarMonth() {
     calendarTotals = totals;
     renderCalendar();
   });
+  // 수동 기록(식단을 못 적은 날의 성공/실패 표시)
+  const mq = fb.query(
+    fb.collection(fb.db, "users", currentUser.uid, "manualDayStatus"),
+    fb.where("date", ">=", monthStart),
+    fb.where("date", "<=", monthEnd)
+  );
+  calendarManualUnsub = fb.onSnapshot(mq, (snap) => {
+    const manual = {};
+    snap.forEach(d => {
+      const v = d.data();
+      if (v.status === "success" || v.status === "fail") manual[v.date] = v.status;
+    });
+    calendarManual = manual;
+    renderCalendar();
+  }, (err) => console.warn("수동 기록 불러오기 실패", err));
 }
 
 document.getElementById("cal-prev").addEventListener("click", () => {
@@ -2328,11 +2355,15 @@ function renderCalendar() {
   const lastDay = daysInMonth(calendarMonth);
   const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0 = 일요일
   const dateOf = day => `${calendarMonth}-${String(day).padStart(2, "0")}`;
-  const achieved = day => {
-    if (day < 1 || day > lastDay) return false;
-    const cal = calendarTotals[dateOf(day)];
-    return cal !== undefined && isCalendarGoalMet(cal);
+  // 식단 기록이 있으면 자동 계산, 없으면 수동 기록, 둘 다 없으면 null(미기록)
+  const statusOf = day => {
+    if (day < 1 || day > lastDay) return null;
+    const date = dateOf(day);
+    const cal = calendarTotals[date];
+    if (cal !== undefined) return isCalendarGoalMet(cal) ? "success" : "fail";
+    return calendarManual[date] || null;
   };
+  const achieved = day => statusOf(day) === "success";
 
   const cells = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(`<div class="cal-cell cal-blank"></div>`);
@@ -2343,6 +2374,7 @@ function renderCalendar() {
     const col = (firstWeekday + day - 1) % 7;
     const cal = calendarTotals[date];
     const hasRecord = cal !== undefined;
+    const manual = hasRecord ? null : (calendarManual[date] || null);
     const done = achieved(day);
     if (done) achievedCount++;
 
@@ -2363,8 +2395,9 @@ function renderCalendar() {
     }
 
     let ring = "";
-    if (hasRecord) {
-      const pct = goals.calorie ? Math.min(cal / goals.calorie, 1) : 0;
+    if (hasRecord || manual) {
+      // 수동 기록은 칼로리 값이 없으니 링을 꽉 채워서 보여줌
+      const pct = manual ? 1 : (goals.calorie ? Math.min(cal / goals.calorie, 1) : 0);
       const state = done ? "done" : "over";
       ring = `
         <svg viewBox="0 0 40 40" class="cal-ring">
@@ -2374,17 +2407,22 @@ function renderCalendar() {
             stroke-dashoffset="${CAL_RING_CIRCUMFERENCE * (1 - pct)}"/>
         </svg>`;
     }
-    const title = hasRecord ? `${m}월 ${day}일 · ${Math.round(cal)}kcal` : `${m}월 ${day}일 · 기록 없음`;
+    const title = hasRecord ? `${m}월 ${day}일 · ${Math.round(cal)}kcal`
+      : manual ? `${m}월 ${day}일 · 수동 기록(${manual === "success" ? "성공" : "실패"})`
+      : `${m}월 ${day}일 · 기록 없음`;
     cells.push(`
       <button type="button" class="${classes.join(" ")}" data-cal-date="${date}" title="${title}"
         ${date > today ? "disabled" : ""}>
-        <span class="cal-day${hasRecord ? "" : " empty"}">${ring}<span class="cal-num">${day}</span></span>
+        <span class="cal-day${hasRecord || manual ? "" : " empty"}">${ring}<span class="cal-num">${day}</span></span>
       </button>`);
   }
   grid.innerHTML = cells.join("");
 
   grid.querySelectorAll("[data-cal-date]").forEach(btn => {
+    attachLongPress(btn, () => onCalendarLongPress(btn));
     btn.addEventListener("click", () => {
+      // 길게 누른 직후 따라오는 click은 무시 (홈으로 넘어가지 않게)
+      if (btn.dataset.longPressed) { delete btn.dataset.longPressed; return; }
       setCurrentDate(btn.dataset.calDate);
       switchView("home");
     });
@@ -2393,6 +2431,100 @@ function renderCalendar() {
   document.getElementById("cal-summary").textContent =
     achievedCount > 0 ? `${m}월 칼로리 목표 달성 ${achievedCount}일` : "";
 }
+
+// ---------- 달력 수동 기록 (식단을 못 적은 날의 성공/실패) ----------
+const LONG_PRESS_MS = 500;
+
+function manualDayRef(date) {
+  return fb.doc(fb.db, "users", currentUser.uid, "manualDayStatus", date);
+}
+
+// 길게 누르기: 손가락이 조금만 움직여도(스크롤) 취소. 성공하면 뒤따르는 click을 막도록 표시해 둠
+function attachLongPress(el, onLongPress) {
+  let timer = null;
+  let startX = 0, startY = 0;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    delete el.dataset.longPressed;
+    startX = e.clientX; startY = e.clientY;
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      el.dataset.longPressed = "1";
+      onLongPress();
+    }, LONG_PRESS_MS);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (timer && Math.hypot(e.clientX - startX, e.clientY - startY) > 10) cancel();
+  });
+  el.addEventListener("pointerup", cancel);
+  el.addEventListener("pointercancel", cancel);
+  el.addEventListener("pointerleave", cancel);
+  el.addEventListener("contextmenu", (e) => e.preventDefault()); // 안드로이드 길게 누르기 메뉴 막기
+}
+
+async function onCalendarLongPress(btn) {
+  const date = btn.dataset.calDate;
+  if (!date || date > todayStr()) return;
+  if (calendarTotals[date] !== undefined) return; // 식단 기록이 있는 날은 자동 계산만 (덮어쓰기 안 됨)
+  if (navigator.vibrate) navigator.vibrate(10);
+  if (calendarManual[date]) {
+    // 이미 수동 표시한 날 → 바로 미기록으로 되돌림
+    closeManualDayPopup();
+    try {
+      await fb.deleteDoc(manualDayRef(date));
+    } catch (err) {
+      alert("수동 기록을 지우지 못했어요: " + err.message);
+    }
+    return;
+  }
+  openManualDayPopup(btn);
+}
+
+let manualPopupDate = null;
+
+function openManualDayPopup(btn) {
+  manualPopupDate = btn.dataset.calDate;
+  const [, m, d] = manualPopupDate.split("-").map(Number);
+  document.getElementById("manual-day-label").textContent = `${m}월 ${d}일 수동 기록`;
+  const popup = document.getElementById("manual-day-popup");
+  popup.style.display = "block";
+  document.getElementById("manual-day-backdrop").style.display = "block";
+  // 누른 칸 바로 아래(공간이 없으면 위)에 띄우고, 화면 밖으로 나가지 않게 좌우를 맞춤
+  const rect = btn.getBoundingClientRect();
+  const pw = popup.offsetWidth, ph = popup.offsetHeight;
+  const margin = 12;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
+  let top = rect.bottom + 6;
+  if (top + ph > window.innerHeight - margin) top = rect.top - ph - 6;
+  popup.style.left = `${left}px`;
+  popup.style.top = `${Math.max(margin, top)}px`;
+}
+
+function closeManualDayPopup() {
+  manualPopupDate = null;
+  const popup = document.getElementById("manual-day-popup");
+  if (!popup) return;
+  popup.style.display = "none";
+  document.getElementById("manual-day-backdrop").style.display = "none";
+}
+
+document.getElementById("manual-day-backdrop").addEventListener("click", closeManualDayPopup);
+document.querySelectorAll("[data-manual-status]").forEach(b => {
+  b.addEventListener("click", async () => {
+    const date = manualPopupDate;
+    const status = b.dataset.manualStatus;
+    closeManualDayPopup();
+    if (!date || calendarTotals[date] !== undefined) return;
+    try {
+      await fb.setDoc(manualDayRef(date), { date, status, updatedAt: fb.serverTimestamp() });
+    } catch (err) {
+      alert("수동 기록을 저장하지 못했어요: " + err.message);
+    }
+  });
+});
 
 // ---------- Modal helpers ----------
 function openModal(id) { document.getElementById(id).style.display = "flex"; }
