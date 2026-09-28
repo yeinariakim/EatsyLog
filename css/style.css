@@ -709,7 +709,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .fav-summary { color: var(--text-soft); font-size: 13px; }
 .fav-del { flex-shrink: 0; }
 .fav-check { margin: 0; color: var(--text); }
-.fav-check-hint { color: var(--text-soft); font-size: 12px; }
 .ex-fav-btn {
   flex-shrink: 0;
   border: 1px solid var(--line);
@@ -956,19 +955,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   margin: 18px 0 8px;
   min-height: 1em;
 }
-.cal-legend {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-soft);
-}
-.cal-legend span { display: flex; align-items: center; gap: 4px; }
-.cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.cal-dot.done { background: var(--accent); }
-.cal-dot.over { background: var(--warn); }
-.cal-hint { text-align: center; font-size: 11px; color: var(--text-soft); margin: 10px 0 0; }
 /* 길게 누를 때 아이폰 확대경/복사 메뉴가 뜨지 않게 */
 .cal-cell {
   -webkit-touch-callout: none;
@@ -989,7 +975,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   box-shadow: 0 8px 24px rgba(31, 36, 33, 0.12);
   padding: 10px;
 }
-.manual-day-label { margin: 0 0 8px; font-size: 12px; color: var(--text-soft); text-align: center; }
 .manual-day-actions { display: flex; gap: 8px; }
 .manual-day-btn {
   flex: 1;
@@ -1073,6 +1058,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   margin-bottom: 16px;
 }
 .modal-header h3 { margin: 0; font-size: 17px; }
+.modal-header .icon-btn { margin-left: auto; } /* 제목이 없는 모달에서도 닫기 버튼은 오른쪽 */
 
 .search-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .search-row input { flex: 1; min-width: 0; }

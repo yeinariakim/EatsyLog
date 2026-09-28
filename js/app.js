@@ -703,7 +703,7 @@ async function doFoodSearch() {
     return;
   }
   if (finalResults.length === 0) {
-    resultsEl.innerHTML = `<li>검색 결과가 없어요. 다른 단어로 시도하거나 직접 입력해보세요.</li>`;
+    resultsEl.innerHTML = `<li>검색 결과가 없어요</li>`;
     return;
   }
 
@@ -1283,7 +1283,7 @@ function renderInbodyHistory() {
   const el = document.getElementById("inbody-history");
   if (!el) return;
   if (allInbody.length === 0) {
-    el.innerHTML = `<li class="food-list-empty">인바디를 잰 날에만 기록하면 돼요</li>`;
+    el.innerHTML = `<li class="food-list-empty">아직 인바디 기록이 없어요</li>`;
     return;
   }
   const recent = [...allInbody].reverse().slice(0, 30);
@@ -1606,7 +1606,7 @@ function favCheck(d, i) {
   return `
     <label class="checkbox-row fav-check">
       <input type="checkbox" ${bind(i, "saveFav")} ${d.saveFav ? "checked" : ""}>
-      ⭐ 즐겨찾기에 저장 <span class="fav-check-hint">(칼로리·심박수 제외)</span>
+      ⭐ 즐겨찾기에 저장
     </label>`;
 }
 
@@ -1622,7 +1622,7 @@ function renderExercises(d, i) {
     <div class="exercise-list">${d.exercises.map((ex, k) => `
       <div class="exercise-item">
         <div class="exercise-head">
-          <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
+          <input type="text" placeholder="종목 이름" value="${escapeHtml(ex.name)}"
             ${bind(i, "name")} data-ex="${k}" class="exercise-name-input" autocomplete="off">
           ${exFavButton(ex, i, k)}
           <button type="button" class="food-remove" data-act="remove-ex" data-b="${i}" data-ex="${k}">삭제</button>
@@ -1649,9 +1649,9 @@ function renderExercises(d, i) {
 function renderBlockBody(d, i) {
   if (d.type === "cardio") {
     return `
-      <input type="text" placeholder="운동 종류 (예: 인터벌 러닝)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+      <input type="text" placeholder="운동 종류" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
       <div class="field-grid">${timeField(d, i)}</div>
-      <textarea rows="2" placeholder="코스명 (예: 마이마운틴 미디움 2번 코스, 3.0-4.5-6.0-8.5 반복*2)" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
+      <textarea rows="2" placeholder="코스명" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
       <div class="field-grid">
         ${numField(d, i, "distanceKm", "거리 (km, 선택)")}
         ${numField(d, i, "calorie", "소모 칼로리 (kcal)")}
@@ -1669,7 +1669,7 @@ function renderBlockBody(d, i) {
       </div>`;
   }
   return `
-    <input type="text" placeholder="이름 (예: 웜업, 턱걸이 연습, 쿨다운 스트레칭)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+    <input type="text" placeholder="이름" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
     <div class="field-grid">
       ${timeField(d, i)}
       ${numField(d, i, "reps", "횟수 (선택)", "1")}
@@ -2043,7 +2043,6 @@ document.getElementById("workout-total-reset").addEventListener("click", () => {
 function openWorkoutModal(w = null) {
   editingWorkoutId = w ? w.id : null;
   editingWorkoutCreatedAt = w ? (w.createdAt || null) : null;
-  document.getElementById("workout-modal-title").textContent = w ? "운동 기록 수정" : "운동 기록 추가";
   document.getElementById("workout-error").textContent = "";
   document.getElementById("workout-place").value = w?.place ?? "";
 
@@ -2486,8 +2485,6 @@ let manualPopupDate = null;
 
 function openManualDayPopup(btn) {
   manualPopupDate = btn.dataset.calDate;
-  const [, m, d] = manualPopupDate.split("-").map(Number);
-  document.getElementById("manual-day-label").textContent = `${m}월 ${d}일 수동 기록`;
   const popup = document.getElementById("manual-day-popup");
   popup.style.display = "block";
   document.getElementById("manual-day-backdrop").style.display = "block";
