@@ -89,7 +89,7 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
    줄을 누르면(`progressSelected`) 그 종목만 Chart.js 큰 라인 그래프로 보여주고, "‹ 전체 종목"으로 목록에 돌아가요.
    (운동 기록은 전체를 한 번에 구독해서 `allWorkouts`에 두고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요)
 7. **달력** 탭은 한 달 기록을 구독해서 날짜별 칼로리 달성 정도를 작은 도넛링으로 보여줘요.
-   달력의 "달성"은 칼로리가 목표 **이하**인 날이에요 (`isCalendarGoalMet()`). 홈 링 아래 요약 줄은 탄수화물이 목표를 넘었을 때만 경고를 보여줘요.
+   달력의 "달성"은 칼로리가 **그날 목표** 이하인 날이에요 (`isCalendarGoalMet()`, 목표는 `goalsFor(date)`로 찾아요). 홈 링 아래 요약 줄은 탄수화물이 목표를 넘었을 때만 경고를 보여줘요.
    연속 달성 바(스트릭)도 이 기준으로 계산해요. 날짜를 누르면 홈으로 이동해요.
    **수동 기록**: 식단 기록이 하나도 없는 날을 길게 누르면(`attachLongPress()`) 작은 선택창이 떠서 "성공/실패"를 직접 표시해요
    (`manualDayStatus`). 이미 수동 표시한 날을 다시 길게 누르면 바로 지워져요. 식단 기록이 있는 날은 길게 눌러도 아무 일 없어요.
@@ -99,6 +99,12 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
    날짜는 폼에서 직접 고르고(기본값은 위쪽 날짜), 지난 기록을 누르면 폼에서 고칠 수 있어요.
    그래프는 세 지표를 한 차트에 색을 나눠 그려요.
 9. **마이페이지** 탭에서 목표 수정·알림 켜기/끄기(스위치)·로그아웃을 해요. (예전 "설정" 모달을 대신함)
+   **목표는 이력으로 쌓여요** (`goalHistory`). 어떤 날짜의 목표는 그 날짜 이전(당일 포함)에 시작한 목표 중 가장 최근 것이에요 (`goalsFor(date)`).
+   그래서 목표를 바꿔도 지난 날짜의 달력 성공/실패·홈 게이지는 그때 목표 그대로예요.
+   목표 폼은 평소엔 날짜 칸을 숨겨 두고 "오늘부터" 저장해요. "다른 날짜부터 적용" 버튼을 누르면 시작일 칸이 나와요 (오늘 이후는 안 됨).
+   아래 목록의 지난 목표를 누르면 폼에서 고칠 수 있어요 (이때는 시작일 칸이 바로 보여요).
+   맨 처음 목표는 시작일이 `FIRST_GOAL_START`("0000-01-01", 화면에는 "처음부터")라서 그보다 앞선 모든 날짜를 덮어요.
+   이건 지우거나 시작일을 바꿀 수 없어요. 이력이 하나도 없으면 로그인할 때 `users/{uid}.goals`를 "처음부터" 목표로 옮겨요.
 
 ## 데이터 구조 (Firestore)
 
@@ -106,7 +112,10 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
 
 ```
 users/{uid}
-  goals: { calorie, protein, carb, fat }
+  goals: { calorie, protein, carb, fat }   (예전 방식 값. 지금은 오늘 목표로 맞춰 두기만 하고, 판정은 goalHistory로 해요)
+
+users/{uid}/goalHistory/{시작일}     목표 이력 (문서 ID = 적용 시작일, "처음부터"는 "0000-01-01")
+  startDate, calorie, protein, carb, fat, updatedAt
 
 users/{uid}/entries/{자동ID}         한 번 먹은 기록
   date("YYYY-MM-DD"), meal(breakfast|lunch|dinner|snack), name,
