@@ -943,6 +943,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 }
 .cal-ring-progress.done { stroke: var(--accent); }
 .cal-ring-progress.over { stroke: var(--warn); }
+.cal-ring-progress.manual { stroke-linecap: butt; } /* 점선 조각이 둥글게 번져서 이어 보이지 않게 */
 .cal-num { position: relative; font-size: 12px; }
 .cal-cell.done .cal-num { font-weight: 700; color: var(--accent); }
 .cal-cell.today .cal-num { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
