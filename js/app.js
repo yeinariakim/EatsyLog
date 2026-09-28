@@ -6,8 +6,13 @@ import { setupNotifications, isNotificationEnabled, disableNotifications } from 
 let fb; // firebase refs, set once firebase-config.js signals ready
 let currentUser = null;
 let currentDate = todayStr();     // "YYYY-MM-DD"
-let goals = { calorie: 1450, protein: 105, carb: 40, fat: 95 };
+let goals = { calorie: 1450, protein: 105, carb: 40, fat: 95 }; // 목표 이력이 없을 때만 쓰는 기본값
+let goalHistory = [];         // 목표 이력 [{ startDate, calorie, protein, carb, fat }] (시작일순)
+let goalHistoryUnsub = null;
+let goalHistoryMigrating = false; // 예전 목표를 첫 이력으로 옮기는 중이면 true (두 번 만들지 않도록)
+let editingGoalStart = null;  // 지난 목표를 고치는 중이면 그 목표의 시작일
 let entriesUnsub = null;
+let currentEntries = [];      // 홈에 보이는 날짜의 식단 기록 (목표가 바뀌면 게이지를 다시 그릴 때 씀)
 let weightsUnsub = null;
 let allWeights = [];
 let pendingMeal = null;      // which meal the food modal is adding to
@@ -243,6 +248,7 @@ function initAuth() {
       document.getElementById("app").style.display = "block";
       document.getElementById("mypage-email").textContent = user.email || "";
       await loadGoals();
+      subscribeToGoalHistory();
       subscribeToDate(currentDate);
       subscribeToWeights();
       subscribeToInbody();
@@ -257,6 +263,11 @@ function initAuth() {
       document.getElementById("auth-screen").style.display = "block";
       if (entriesUnsub) entriesUnsub();
       if (weightsUnsub) weightsUnsub();
+      if (goalHistoryUnsub) { goalHistoryUnsub(); goalHistoryUnsub = null; }
+      goalHistory = [];
+      goalHistoryMigrating = false;
+      currentEntries = [];
+      editingGoalStart = null;
       if (inbodyUnsub) { inbodyUnsub(); inbodyUnsub = null; }
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
       if (workoutFavsUnsub) { workoutFavsUnsub(); workoutFavsUnsub = null; }
@@ -338,6 +349,28 @@ document.getElementById("logout-btn").addEventListener("click", async () => {
 });
 
 // ---------- Goals (마이페이지) ----------
+// 목표는 "언제부터 적용했는지"와 같이 이력으로 쌓아요: users/{uid}/goalHistory/{시작일}
+// 어떤 날짜의 목표 = 그 날짜 이전(당일 포함)에 시작한 목표 중 가장 최근 것.
+// 그래서 목표를 바꿔도 지난 날짜의 달력 성공/실패·홈 게이지는 그때 목표 그대로예요.
+// 맨 처음 목표는 시작일이 FIRST_GOAL_START("처음부터")라서 모든 지난 날짜를 덮어요. 이건 지우거나 시작일을 바꿀 수 없어요.
+// users/{uid}.goals 는 예전 방식 값 — 이력이 하나도 없을 때 첫 이력으로 옮기는 데 쓰고, 오늘 목표로 맞춰 둬요.
+const GOAL_KEYS = ["calorie", "protein", "carb", "fat"];
+const FIRST_GOAL_START = "0000-01-01";
+
+function goalStartLabel(startDate) {
+  return startDate === FIRST_GOAL_START ? "처음부터" : `${formatDateLabel(startDate)}부터`;
+}
+
+function goalsFor(date, history = goalHistory) {
+  if (history.length === 0) return goals;
+  let found = history[0];
+  for (const g of history) {
+    if (g.startDate <= date) found = g;
+    else break;
+  }
+  return found;
+}
+
 async function loadGoals() {
   const snap = await fb.getDoc(fb.doc(fb.db, "users", currentUser.uid));
   if (snap.exists() && snap.data().goals) {
@@ -345,28 +378,154 @@ async function loadGoals() {
   } else {
     await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
   }
-  document.getElementById("goal-calorie").value = goals.calorie;
-  document.getElementById("goal-protein").value = goals.protein;
-  document.getElementById("goal-carb").value = goals.carb;
-  document.getElementById("goal-fat").value = goals.fat;
+  resetGoalForm();
   renderGauges();
 }
 
+function goalHistoryRef(startDate) {
+  return fb.doc(fb.db, "users", currentUser.uid, "goalHistory", startDate);
+}
+
+function subscribeToGoalHistory() {
+  if (goalHistoryUnsub) goalHistoryUnsub();
+  const q = fb.query(fb.collection(fb.db, "users", currentUser.uid, "goalHistory"), fb.orderBy("startDate"));
+  let first = true;
+  goalHistoryUnsub = fb.onSnapshot(q, (snap) => {
+    // 이력이 아직 없으면(이 기능 전에 가입했거나 막 가입한 경우) 지금 목표를 "처음부터" 목표로 만들어요.
+    // 그래서 지난 날짜들은 지금까지처럼 이 목표로 보이고, 이후에 바꾼 목표는 바꾼 날부터만 적용돼요.
+    if (snap.empty && !snap.metadata.fromCache && !goalHistoryMigrating) {
+      goalHistoryMigrating = true;
+      fb.setDoc(goalHistoryRef(FIRST_GOAL_START), { startDate: FIRST_GOAL_START, ...pickGoalValues(goals), updatedAt: fb.serverTimestamp() })
+        .catch(err => { goalHistoryMigrating = false; console.warn("목표 이력 만들기 실패", err); });
+      return;
+    }
+    goalHistory = [];
+    snap.forEach(d => goalHistory.push({ ...d.data(), startDate: d.id }));
+    if (first && goalHistory.length > 0) { first = false; resetGoalForm(); }
+    renderGoalHistory();
+    renderGauges();
+    renderCalendar(); // 목표 이력이 바뀌면 달력의 달성 여부도 다시 계산
+  }, (err) => console.warn("목표 이력 불러오기 실패", err));
+}
+
+function pickGoalValues(g) {
+  const out = {};
+  GOAL_KEYS.forEach(k => { out[k] = Number(g[k]) || 0; });
+  return out;
+}
+
+function fillGoalForm(g) {
+  document.getElementById("goal-calorie").value = g.calorie;
+  document.getElementById("goal-protein").value = g.protein;
+  document.getElementById("goal-carb").value = g.carb;
+  document.getElementById("goal-fat").value = g.fat;
+}
+
+// 기본 상태: 오늘부터 적용할 새 목표 (칸에는 지금 목표를 채워 둠)
+function resetGoalForm() {
+  editingGoalStart = null;
+  const startEl = document.getElementById("goal-start");
+  startEl.value = todayStr();
+  startEl.max = todayStr();
+  startEl.required = true;
+  document.getElementById("goal-start-label").style.display = "";
+  fillGoalForm(goalsFor(todayStr()));
+  document.getElementById("settings-save-btn").textContent = "저장";
+  document.getElementById("goal-cancel").style.display = "none";
+  renderGoalHistory();
+}
+
+function startEditGoal(g) {
+  editingGoalStart = g.startDate;
+  // "처음부터" 목표는 시작일이 없어서 날짜 칸을 숨겨요
+  const isFirst = g.startDate === FIRST_GOAL_START;
+  const startEl = document.getElementById("goal-start");
+  startEl.value = isFirst ? "" : g.startDate;
+  startEl.required = !isFirst;
+  document.getElementById("goal-start-label").style.display = isFirst ? "none" : "";
+  fillGoalForm(g);
+  document.getElementById("settings-save-btn").textContent = "수정";
+  document.getElementById("goal-cancel").style.display = "";
+  renderGoalHistory();
+  document.getElementById("settings-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+document.getElementById("goal-cancel").addEventListener("click", resetGoalForm);
+
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  goals = {
-    calorie: Number(document.getElementById("goal-calorie").value),
-    protein: Number(document.getElementById("goal-protein").value),
-    carb: Number(document.getElementById("goal-carb").value),
-    fat: Number(document.getElementById("goal-fat").value)
-  };
-  await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
-  renderGauges();
-  renderCalendar(); // 목표가 바뀌면 달력의 달성 여부도 다시 계산
+  const startDate = editingGoalStart === FIRST_GOAL_START ? FIRST_GOAL_START : document.getElementById("goal-start").value;
+  if (!startDate) return;
+  if (startDate > todayStr()) { alert("오늘 이후 날짜부터 적용할 수는 없어요"); return; }
+  const values = pickGoalValues({
+    calorie: document.getElementById("goal-calorie").value,
+    protein: document.getElementById("goal-protein").value,
+    carb: document.getElementById("goal-carb").value,
+    fat: document.getElementById("goal-fat").value
+  });
+  const exists = goalHistory.some(g => g.startDate === startDate);
+  // 오늘 목표를 다시 바꾸는 건 그냥 덮어써요. 그 외에 이미 있는 시작일로 저장하면 한 번 물어봐요
+  const isTodayUpdate = !editingGoalStart && startDate === todayStr();
+  if (exists && startDate !== editingGoalStart && !isTodayUpdate
+    && !confirm(`${goalStartLabel(startDate)} 적용한 목표가 이미 있어요. 덮어쓸까요?`)) return;
+
+  // 저장 후 이력을 미리 계산해서, 오늘 목표를 users/{uid}.goals 에도 맞춰 둬요
+  const nextHistory = goalHistory
+    .filter(g => g.startDate !== startDate && g.startDate !== editingGoalStart)
+    .concat({ startDate, ...values })
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  goals = pickGoalValues(goalsFor(todayStr(), nextHistory));
+
+  try {
+    await fb.setDoc(goalHistoryRef(startDate), { startDate, ...values, updatedAt: fb.serverTimestamp() });
+    // 고치면서 시작일을 바꿨으면 예전 시작일 문서는 지워요 (문서 ID = 시작일이라서)
+    if (editingGoalStart && editingGoalStart !== startDate) await fb.deleteDoc(goalHistoryRef(editingGoalStart));
+    await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
+  } catch (err) {
+    console.error("목표 저장 실패", err);
+    alert("목표를 저장하지 못했어요");
+    return;
+  }
+  resetGoalForm();
   const saveBtn = document.getElementById("settings-save-btn");
   saveBtn.textContent = "저장됨 ✓";
-  setTimeout(() => { saveBtn.textContent = "저장"; }, 1500);
+  setTimeout(() => { if (!editingGoalStart) saveBtn.textContent = "저장"; }, 1500);
 });
+
+function renderGoalHistory() {
+  const el = document.getElementById("goal-history");
+  if (!el) return;
+  const current = goalHistory.length ? goalsFor(todayStr()).startDate : null;
+  el.innerHTML = [...goalHistory].reverse().map(g => `
+    <li>
+      <button type="button" class="inbody-edit-trigger${g.startDate === editingGoalStart ? " editing" : ""}" data-goal-edit="${escapeHtml(g.startDate)}">
+        <span class="w-date">${escapeHtml(goalStartLabel(g.startDate))}${g.startDate === current ? ` <b class="goal-now">지금</b>` : ""}</span>
+        <span class="inbody-values">${g.calorie}kcal · <i>단</i>${g.protein} <i>탄</i>${g.carb} <i>지</i>${g.fat}</span>
+      </button>
+      ${g.startDate === FIRST_GOAL_START ? "" : `<button type="button" class="food-remove" data-goal-remove="${escapeHtml(g.startDate)}">삭제</button>`}
+    </li>
+  `).join("");
+
+  el.querySelectorAll("[data-goal-edit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const g = goalHistory.find(x => x.startDate === btn.dataset.goalEdit);
+      if (g) startEditGoal(g);
+    });
+  });
+  el.querySelectorAll("[data-goal-remove]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const startDate = btn.dataset.goalRemove;
+      if (goalHistory.length <= 1) { alert("목표가 하나뿐이라 지울 수 없어요"); return; }
+      const isFirst = goalHistory[0].startDate === startDate;
+      if (!confirm(`${goalStartLabel(startDate)} 적용한 목표를 삭제할까요?\n이 기간은 ${isFirst ? "다음" : "바로 앞"} 목표로 계산돼요.`)) return;
+      const nextHistory = goalHistory.filter(g => g.startDate !== startDate);
+      goals = pickGoalValues(goalsFor(todayStr(), nextHistory));
+      await fb.deleteDoc(goalHistoryRef(startDate));
+      await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
+      if (editingGoalStart === startDate) resetGoalForm();
+    });
+  });
+}
 
 // ---------- Date navigation ----------
 // 홈·체중·운동 탭이 같이 보는 날짜를 바꿈 (오늘 이후로는 못 감) — 달력에서 날짜를 눌렀을 때도 이걸 써요
@@ -504,6 +663,7 @@ function subscribeToDate(dateStr) {
   entriesUnsub = fb.onSnapshot(q, (snap) => {
     const entries = [];
     snap.forEach(docSnap => entries.push({ id: docSnap.id, ...docSnap.data() }));
+    currentEntries = entries;
     renderMeals(entries);
     renderGauges(entries);
   });
@@ -559,7 +719,8 @@ function renderMeals(entries) {
   });
 }
 
-function renderGauges(entries = []) {
+function renderGauges(entries = currentEntries) {
+  const dayGoals = goalsFor(currentDate); // 그날 적용된 목표 (지난 날짜는 그때 목표)
   const totals = entries.reduce((acc, e) => {
     acc.calorie += e.calorie || 0;
     acc.protein += e.protein || 0;
@@ -572,7 +733,7 @@ function renderGauges(entries = []) {
 
   ["calorie", "protein", "carb", "fat"].forEach(metric => {
     const value = totals[metric];
-    const goal = goals[metric] || 1;
+    const goal = dayGoals[metric] || 1;
     const pct = Math.min(value / goal, 1);
     const ring = document.querySelector(`[data-ring="${metric}"]`);
     ring.style.strokeDashoffset = circumference - (pct * circumference);
@@ -583,20 +744,20 @@ function renderGauges(entries = []) {
     goalEl.textContent = metric === "carb" ? `/ ${goal} 이하` : `/ ${goal}`;
   });
 
-  renderSummary(totals);
+  renderSummary(totals, dayGoals);
   renderExtrasSummary(entries);
 }
 
-// 달력의 "목표 달성" 기준: 칼로리가 목표 이하면 달성 (탄단지는 안 봄, 적게 먹은 날도 달성)
-function isCalendarGoalMet(calorie) {
-  return calorie <= goals.calorie;
+// 달력의 "목표 달성" 기준: 칼로리가 그날 목표 이하면 달성 (탄단지는 안 봄, 적게 먹은 날도 달성)
+function isCalendarGoalMet(calorie, date) {
+  return calorie <= goalsFor(date).calorie;
 }
 
 // 홈 요약: 탄수화물이 목표를 넘었을 때만 경고 한 줄 (그 외에는 비워 둠)
-function renderSummary(totals) {
+function renderSummary(totals, dayGoals) {
   const summaryEl = document.getElementById("daily-summary");
-  summaryEl.textContent = totals.carb > goals.carb
-    ? `탄수화물이 목표보다 ${Math.round(totals.carb - goals.carb)}g 많아요`
+  summaryEl.textContent = totals.carb > dayGoals.carb
+    ? `탄수화물이 목표보다 ${Math.round(totals.carb - dayGoals.carb)}g 많아요`
     : "";
 }
 
@@ -2366,7 +2527,7 @@ function renderCalendar() {
     if (day < 1 || day > lastDay) return null;
     const date = dateOf(day);
     const cal = calendarTotals[date];
-    if (cal !== undefined) return isCalendarGoalMet(cal) ? "success" : "fail";
+    if (cal !== undefined) return isCalendarGoalMet(cal, date) ? "success" : "fail";
     return calendarManual[date] || null;
   };
   const achieved = day => statusOf(day) === "success";
@@ -2403,7 +2564,8 @@ function renderCalendar() {
     let ring = "";
     if (hasRecord || manual) {
       // 수동 기록은 칼로리 값이 없으니 링을 한 바퀴 점선으로 그려서 자동 계산(실선)과 구분
-      const pct = manual ? 1 : (goals.calorie ? Math.min(cal / goals.calorie, 1) : 0);
+      const goalCal = goalsFor(date).calorie;
+      const pct = manual ? 1 : (goalCal ? Math.min(cal / goalCal, 1) : 0);
       const state = done ? "done" : "over";
       ring = `
         <svg viewBox="0 0 40 40" class="cal-ring">
