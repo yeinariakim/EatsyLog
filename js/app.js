@@ -2281,6 +2281,9 @@ function renderProgressChart() {
 
 // ---------- Calendar ----------
 const CAL_RING_CIRCUMFERENCE = 2 * Math.PI * 17; // 달력 칸 도넛링 (r=17)
+// 수동 기록 링의 점선: 둘레를 16칸으로 딱 나눠서 이음매가 어긋나지 않게 (선 60% + 빈칸 40%)
+const CAL_RING_DASH = CAL_RING_CIRCUMFERENCE / 16;
+const CAL_RING_DASHED = `${CAL_RING_DASH * 0.6} ${CAL_RING_DASH * 0.4}`;
 
 function addMonths(ym, delta) {
   const [y, m] = ym.split("-").map(Number);
@@ -2396,14 +2399,14 @@ function renderCalendar() {
 
     let ring = "";
     if (hasRecord || manual) {
-      // 수동 기록은 칼로리 값이 없으니 링을 꽉 채워서 보여줌
+      // 수동 기록은 칼로리 값이 없으니 링을 한 바퀴 점선으로 그려서 자동 계산(실선)과 구분
       const pct = manual ? 1 : (goals.calorie ? Math.min(cal / goals.calorie, 1) : 0);
       const state = done ? "done" : "over";
       ring = `
         <svg viewBox="0 0 40 40" class="cal-ring">
           <circle cx="20" cy="20" r="17" class="cal-ring-track"/>
-          <circle cx="20" cy="20" r="17" class="cal-ring-progress ${state}"
-            stroke-dasharray="${CAL_RING_CIRCUMFERENCE}"
+          <circle cx="20" cy="20" r="17" class="cal-ring-progress ${state}${manual ? " manual" : ""}"
+            stroke-dasharray="${manual ? CAL_RING_DASHED : CAL_RING_CIRCUMFERENCE}"
             stroke-dashoffset="${CAL_RING_CIRCUMFERENCE * (1 - pct)}"/>
         </svg>`;
     }
