@@ -15,6 +15,8 @@ let pendingMeal = null;      // which meal the food modal is adding to
 let selectedFoodPer100 = null;
 let referenceServingGrams = null; // this food's own "1회 섭취참고량", if the API provided one
 let favoritePerUnitBasis = null; // perUnit(1단위당) 즐겨찾기를 불러왔을 때, 수동입력 "양"을 바꾸면 다시 스케일링하기 위한 기준값
+let favoriteExtrasBasis = null;       // 즐겨찾기의 추가 항목(카페인 등) 원본값 — 양이 바뀌면 이 기준으로 다시 스케일링
+let favoriteExtrasBasisAmount = null; // 위 extras가 원래 몇 그램/몇 개 기준이었는지
 let weightChart, trendChart;
 let trendMode = "calorie";
 
@@ -61,6 +63,135 @@ const LOCAL_FOODS = [
 
 function searchLocalFoods(keyword) {
   return LOCAL_FOODS.filter(f => f.name.includes(keyword));
+}
+
+// ---------- Extras (카페인/나트륨 등, 탄단지와 별개인 자유 입력 항목) ----------
+// 탄수화물/단백질/지방은 칼로리로 환산되는 "3대 영양소"라 게이지에 고정으로 들어가 있지만,
+// 카페인/나트륨/식이섬유 같은 건 계열이 달라서(칼로리에 안 잡힘) 이름+수치+단위를 자유롭게 넣게 함
+function makeExtrasController(listElId) {
+  let items = []; // [{ name, value, unit }]
+
+  function render() {
+    const el = document.getElementById(listElId);
+    if (!el) return;
+    if (items.length === 0) { el.innerHTML = ""; return; }
+    el.innerHTML = items.map((it, i) => `
+      <span class="extra-chip" data-i="${i}">
+        <span>${escapeHtml(it.name)} ${formatAmount(it.value)}${it.unit || ""}</span>
+        <button type="button" class="extra-remove" data-remove-extra="${i}">×</button>
+      </span>
+    `).join("");
+    el.querySelectorAll("[data-remove-extra]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        items.splice(Number(btn.dataset.removeExtra), 1);
+        render();
+      });
+    });
+  }
+
+  return {
+    add(name, value, unit) {
+      if (!name || !Number.isFinite(value)) return;
+      items.push({ name, value, unit: unit || "" });
+      render();
+    },
+    get() { return items.map(it => ({ ...it })); },
+    set(newItems) { items = (newItems || []).map(it => ({ ...it })); render(); },
+    reset() { items = []; render(); }
+  };
+}
+
+const foodExtrasCtl = makeExtrasController("food-extras-list");
+const manualExtrasCtl = makeExtrasController("manual-extras-list");
+const editExtrasCtl = makeExtrasController("edit-extras-list");
+
+function wireExtrasAddButton(prefix, ctl) {
+  const btn = document.getElementById(`${prefix}-extra-add-btn`);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const nameEl = document.getElementById(`${prefix}-extra-name`);
+    const valueEl = document.getElementById(`${prefix}-extra-value`);
+    const unitEl = document.getElementById(`${prefix}-extra-unit`);
+    const name = nameEl.value.trim();
+    const value = Number(valueEl.value);
+    if (!name || !Number.isFinite(value) || valueEl.value === "") return;
+    ctl.add(name, value, unitEl.value);
+    nameEl.value = "";
+    valueEl.value = "";
+    unitEl.value = "";
+  });
+}
+
+wireExtrasAddButton("food", foodExtrasCtl);
+wireExtrasAddButton("manual", manualExtrasCtl);
+wireExtrasAddButton("edit", editExtrasCtl);
+
+// 즐겨찾기에서 불러온 추가 항목을, 실제로 먹은 양에 비례해서 다시 계산
+// (예: 100g 기준 카페인 150mg으로 저장된 즐겨찾기를 50g만 먹었다고 바꾸면 → 75mg으로)
+function scaleExtras(extras, ratio) {
+  return (extras || []).map(ex => ({
+    name: ex.name,
+    value: Math.round(ex.value * ratio * 100) / 100,
+    unit: ex.unit || ""
+  }));
+}
+
+// 같은 이름의 항목을 그날 여러 번 기록했으면 합산 (예: 아메리카노 카페인150 + 비타민음료 카페인50 → 카페인 200)
+function computeExtraTotals(entries) {
+  const totals = {}; // name -> { value, unit }
+  entries.forEach(e => {
+    (e.extras || []).forEach(ex => {
+      if (!ex || !ex.name) return;
+      if (!totals[ex.name]) totals[ex.name] = { value: 0, unit: ex.unit || "" };
+      totals[ex.name].value += Number(ex.value) || 0;
+      if (!totals[ex.name].unit && ex.unit) totals[ex.name].unit = ex.unit;
+    });
+  });
+  return totals;
+}
+
+// 홈 화면에 짧게 표시할 라벨: 기본은 첫 글자, 앞글자가 겹치는 이름끼리는 두 글자로 늘림
+function abbreviateExtraNames(names) {
+  const labels = {};
+  names.forEach(n => { labels[n] = n.slice(0, 1); });
+  const counts = {};
+  names.forEach(n => { counts[labels[n]] = (counts[labels[n]] || 0) + 1; });
+  names.forEach(n => {
+    if (counts[labels[n]] > 1) labels[n] = n.slice(0, 2);
+  });
+  return labels;
+}
+
+let extrasExpanded = false; // 추가 항목이 5개 이상일 때 "더보기"로 접어두는 상태 (날짜 바뀌면 초기화)
+
+function renderExtrasSummary(entries) {
+  const el = document.getElementById("extras-summary");
+  if (!el) return;
+  const totals = computeExtraTotals(entries);
+  const names = Object.keys(totals);
+  if (names.length === 0) {
+    el.innerHTML = "";
+    return;
+  }
+  const labels = abbreviateExtraNames(names);
+  const visibleNames = extrasExpanded ? names : names.slice(0, 4);
+  const chips = visibleNames.map(n => {
+    const t = totals[n];
+    const val = formatAmount(Math.round(t.value * 10) / 10);
+    return `<span class="extra-summary-chip" title="${escapeHtml(n)}">${escapeHtml(labels[n])}${val}${t.unit || ""}</span>`;
+  }).join("");
+  const hiddenCount = names.length - visibleNames.length;
+  const moreBtn = hiddenCount > 0
+    ? `<button type="button" id="extras-more-btn" class="extra-summary-more">+${hiddenCount}개 더보기</button>`
+    : "";
+  el.innerHTML = chips + moreBtn;
+  const btn = document.getElementById("extras-more-btn");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      extrasExpanded = true;
+      renderExtrasSummary(entries);
+    });
+  }
 }
 
 function todayStr(d = new Date()) {
@@ -217,6 +348,7 @@ document.getElementById("date-next").addEventListener("click", () => {
 // ---------- Entries (meals) ----------
 function subscribeToDate(dateStr) {
   if (entriesUnsub) entriesUnsub();
+  extrasExpanded = false; // 날짜를 옮기면 "더보기" 상태도 초기화
   const q = fb.query(
     fb.collection(fb.db, "users", currentUser.uid, "entries"),
     fb.where("date", "==", dateStr)
@@ -287,6 +419,7 @@ function renderGauges(entries = []) {
   });
 
   renderSummary(totals);
+  renderExtrasSummary(entries);
 }
 
 function renderSummary(totals) {
@@ -360,6 +493,10 @@ function resetFoodModal() {
   selectedFoodPer100 = null;
   referenceServingGrams = null;
   favoritePerUnitBasis = null;
+  favoriteExtrasBasis = null;
+  favoriteExtrasBasisAmount = null;
+  foodExtrasCtl.reset();
+  manualExtrasCtl.reset();
 }
 
 document.getElementById("food-search-btn").addEventListener("click", doFoodSearch);
@@ -417,6 +554,11 @@ async function doFoodSearch() {
 function selectFood(food, opts = {}) {
   selectedFoodPer100 = food;
   favoritePerUnitBasis = null; // 검색으로 새 음식을 고르면 이전에 불러온 즐겨찾기 기준은 무시
+  if (!opts.keepExtrasBasis) {
+    favoriteExtrasBasis = null;
+    favoriteExtrasBasisAmount = null;
+    foodExtrasCtl.reset();
+  }
   document.getElementById("food-detail").style.display = "block";
   document.getElementById("food-detail-name").textContent = food.name;
   document.getElementById("food-detail-per100").textContent =
@@ -463,6 +605,11 @@ function updateServingPreview() {
   document.getElementById("computed-protein").value = macros.protein;
   document.getElementById("computed-carb").value = macros.carb;
   document.getElementById("computed-fat").value = macros.fat;
+
+  // 즐겨찾기의 추가 항목(카페인 등)도 양이 바뀐 만큼 비례해서 다시 계산
+  if (favoriteExtrasBasis && favoriteExtrasBasisAmount) {
+    foodExtrasCtl.set(scaleExtras(favoriteExtrasBasis, grams / favoriteExtrasBasisAmount));
+  }
 }
 
 document.getElementById("add-food-btn").addEventListener("click", async () => {
@@ -474,7 +621,7 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
   const protein = Number(document.getElementById("computed-protein").value) || 0;
   const carb = Number(document.getElementById("computed-carb").value) || 0;
   const fat = Number(document.getElementById("computed-fat").value) || 0;
-  await addEntry({ name: selectedFoodPer100.name, calorie, protein, carb, fat, amount: grams, unit: "g" });
+  await addEntry({ name: selectedFoodPer100.name, calorie, protein, carb, fat, amount: grams, unit: "g", extras: foodExtrasCtl.get() });
 
   const foodFavCheckbox = document.getElementById("food-favorite");
   if (foodFavCheckbox && foodFavCheckbox.checked) {
@@ -488,7 +635,8 @@ document.getElementById("add-food-btn").addEventListener("click", async () => {
         carb: selectedFoodPer100.carb,
         fat: selectedFoodPer100.fat
       },
-      defaultAmount: grams
+      defaultAmount: grams,
+      extras: foodExtrasCtl.get()
     });
   }
   closeModal("food-modal");
@@ -508,6 +656,10 @@ document.getElementById("manual-amount").addEventListener("input", () => {
   document.getElementById("manual-protein").value = Math.round(favoritePerUnitBasis.protein * amount * 10) / 10;
   document.getElementById("manual-carb").value = Math.round(favoritePerUnitBasis.carb * amount * 10) / 10;
   document.getElementById("manual-fat").value = Math.round(favoritePerUnitBasis.fat * amount * 10) / 10;
+  // 즐겨찾기의 추가 항목(카페인 등)도 양이 바뀐 만큼 비례해서 다시 계산
+  if (favoriteExtrasBasis && favoriteExtrasBasisAmount) {
+    manualExtrasCtl.set(scaleExtras(favoriteExtrasBasis, amount / favoriteExtrasBasisAmount));
+  }
 });
 
 document.getElementById("manual-add-btn").addEventListener("click", async () => {
@@ -520,7 +672,7 @@ document.getElementById("manual-add-btn").addEventListener("click", async () => 
   const fat = Number(document.getElementById("manual-fat").value) || 0;
   if (!name) return;
 
-  await addEntry({ name, calorie, protein, carb, fat, amount, unit });
+  await addEntry({ name, calorie, protein, carb, fat, amount, unit, extras: manualExtrasCtl.get() });
 
   if (document.getElementById("manual-favorite").checked) {
     const safeAmount = amount > 0 ? amount : 1;
@@ -540,7 +692,7 @@ document.getElementById("manual-add-btn").addEventListener("click", async () => 
   closeModal("food-modal");
 });
 
-async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = "회" }) {
+async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = "회", extras = [] }) {
   const safeAmount = amount > 0 ? amount : 1;
   await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "entries"), {
     date: currentDate,
@@ -551,6 +703,7 @@ async function addEntry({ name, calorie, protein, carb, fat, amount = 1, unit = 
     perUnitProtein: protein / safeAmount,
     perUnitCarb: carb / safeAmount,
     perUnitFat: fat / safeAmount,
+    extras,
     createdAt: fb.serverTimestamp()
   });
 }
@@ -565,6 +718,7 @@ function openEditModal(item) {
   editingEntryId = item.id;
   document.getElementById("edit-name").value = item.name;
   document.getElementById("edit-favorite").checked = false;
+  editExtrasCtl.set(item.extras || []);
 
   editIsGramBased = item.unit === "g";
 
@@ -680,7 +834,8 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
     perUnitCalorie: calorie / amount,
     perUnitProtein: protein / amount,
     perUnitCarb: carb / amount,
-    perUnitFat: fat / amount
+    perUnitFat: fat / amount,
+    extras: editExtrasCtl.get()
   }, { merge: true });
 
   if (document.getElementById("edit-favorite").checked) {
@@ -695,7 +850,8 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
           carb: editPer100.carb,
           fat: editPer100.fat
         },
-        defaultAmount: amount
+        defaultAmount: amount,
+        extras: editExtrasCtl.get()
       });
     } else {
       const safeAmount = amount > 0 ? amount : 1;
@@ -709,7 +865,8 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
           carb: carb / safeAmount,
           fat: fat / safeAmount
         },
-        defaultAmount: safeAmount
+        defaultAmount: safeAmount,
+        extras: editExtrasCtl.get()
       });
     }
   }
@@ -752,11 +909,12 @@ async function loadFavorites() {
     listEl.innerHTML = favs.map((f, i) => {
       const total = favoriteTotal(f);
       const amountLabel = f.defaultAmount ? ` · ${formatAmount(f.defaultAmount)}${f.unit || ""}` : "";
+      const extrasLabel = f.extras && f.extras.length > 0 ? ` · +${f.extras.map(ex => ex.name).join(", ")}` : "";
       return `
       <li data-fav-idx="${i}">
         <button class="fav-select" data-fav-select="${i}">
           <span>${escapeHtml(f.name)}</span>
-          <span class="fav-macro">${total.calorie}kcal${amountLabel}</span>
+          <span class="fav-macro">${total.calorie}kcal${amountLabel}${escapeHtml(extrasLabel)}</span>
         </button>
         <button class="food-remove" data-fav-remove="${f.id}">삭제</button>
       </li>
@@ -774,7 +932,17 @@ async function loadFavorites() {
             carb: f.per100.carb,
             fat: f.per100.fat,
             servingSizeGrams: f.defaultAmount || null
-          }, { preferReference: true });
+          }, { preferReference: true, keepExtrasBasis: true });
+          // 저장된 추가 항목(카페인 등)도 같이 불러오고, 기준량을 기억해뒀다가 양이 바뀌면 비례해서 재계산
+          if (f.extras && f.extras.length > 0) {
+            favoriteExtrasBasis = f.extras;
+            favoriteExtrasBasisAmount = f.defaultAmount || 100;
+            foodExtrasCtl.set(f.extras);
+          } else {
+            favoriteExtrasBasis = null;
+            favoriteExtrasBasisAmount = null;
+            foodExtrasCtl.reset();
+          }
         } else if (f.basis === "perUnit" && f.perUnit) {
           // 개/인분/컵 등 단위 기반 음식: 직접 입력 화면에 불러와서 양만 조절
           document.getElementById("manual-entry").style.display = "flex";
@@ -787,6 +955,16 @@ async function loadFavorites() {
           document.getElementById("manual-protein").value = Math.round(f.perUnit.protein * amt * 10) / 10;
           document.getElementById("manual-carb").value = Math.round(f.perUnit.carb * amt * 10) / 10;
           document.getElementById("manual-fat").value = Math.round(f.perUnit.fat * amt * 10) / 10;
+          // 저장된 추가 항목(카페인 등)도 같이 불러오고, 기준량을 기억해뒀다가 양이 바뀌면 비례해서 재계산
+          if (f.extras && f.extras.length > 0) {
+            favoriteExtrasBasis = f.extras;
+            favoriteExtrasBasisAmount = amt;
+            manualExtrasCtl.set(f.extras);
+          } else {
+            favoriteExtrasBasis = null;
+            favoriteExtrasBasisAmount = null;
+            manualExtrasCtl.reset();
+          }
         } else {
           // 구버전 즐겨찾기 — 양/단위 기준이 없어서 예전처럼 1회로 바로 추가
           addEntry({ name: f.name, calorie: f.calorie, protein: f.protein, carb: f.carb, fat: f.fat });
