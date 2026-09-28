@@ -247,7 +247,34 @@ input:focus { border-color: var(--accent); }
   font-size: 15px;
   font-weight: 600;
   color: var(--accent);
-  margin: 10px 20px 20px;
+  margin: 10px 20px 4px;
+}
+
+.extras-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 20px 20px;
+}
+.extras-summary:empty { margin: 0; }
+.extra-summary-chip {
+  font-size: 11px;
+  color: var(--text-soft);
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.extra-summary-more {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: none;
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 /* ---------- Meals ---------- */
@@ -493,6 +520,49 @@ input:focus { border-color: var(--accent); }
   color: var(--text-soft);
 }
 .checkbox-row input { width: auto; padding: 0; }
+
+/* ---------- Extras (카페인/나트륨 등 자유 항목) ---------- */
+.extras-block { margin-bottom: 4px; }
+.extras-title { font-size: 12px; color: var(--text-soft); margin: 0 0 6px; }
+.extras-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.extras-list:empty { margin-bottom: 0; }
+.extra-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 4px 6px 4px 12px;
+  font-size: 12px;
+  color: var(--text);
+}
+.extra-remove {
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--text-soft);
+  font-size: 12px;
+  padding: 0;
+  cursor: pointer;
+}
+.extras-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.extras-add-row input[type="text"] { flex: 1.4; min-width: 0; }
+.extras-add-row input[type="number"] { flex: 1; min-width: 0; }
+.extras-add-row select { flex: 1; min-width: 0; }
+.extras-add-row .btn-text { flex-shrink: 0; white-space: nowrap; padding: 8px 6px; }
 
 .favorites-section { margin-top: 8px; }
 .favorites-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 0 0 8px; }
