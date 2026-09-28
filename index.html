@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928f">
+<link rel="stylesheet" href="css/style.css?v=20260928g">
 </head>
 <body>
 
@@ -182,6 +182,28 @@
       <canvas id="weight-chart"></canvas>
     </div>
     <ul id="weight-history" class="weight-history"></ul>
+
+    <!-- 인바디: 집 체중계 기록(weights)과 완전히 따로 저장·표시해요 -->
+    <section class="inbody-section">
+      <p class="mypage-section-title">인바디</p>
+      <form id="inbody-form" class="inbody-form">
+        <label class="inbody-date">날짜<input type="date" id="inbody-date" required></label>
+        <div class="inbody-fields">
+          <label>체중 (kg)<input type="number" id="inbody-weight" step="0.1" min="0" inputmode="decimal" required></label>
+          <label>골격근량 (kg)<input type="number" id="inbody-muscle" step="0.1" min="0" inputmode="decimal" required></label>
+          <label>체지방량 (kg)<input type="number" id="inbody-fat" step="0.1" min="0" inputmode="decimal" required></label>
+        </div>
+        <div class="inbody-actions">
+          <button type="button" id="inbody-cancel" class="btn-secondary" style="display:none">취소</button>
+          <button type="submit" id="inbody-save-btn" class="btn-primary">기록</button>
+        </div>
+      </form>
+      <div id="inbody-chart-body" class="weight-chart-wrap" style="display:none">
+        <canvas id="inbody-chart"></canvas>
+        <p id="inbody-summary" class="progress-summary inbody-summary"></p>
+      </div>
+      <ul id="inbody-history" class="inbody-history"></ul>
+    </section>
   </main>
 
   <main id="view-workout" class="view" style="display:none">
@@ -488,6 +510,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928f"></script>
+<script type="module" src="js/app.js?v=20260928g"></script>
 </body>
 </html>
