@@ -1299,13 +1299,29 @@ function renderInbodyChart() {
 
 // ---------- Workouts (운동) ----------
 // users/{uid}/workouts/{자동ID}
-//   date, place, cardio: {...} | null, strength: {...} | null,
-//   totalMinutes, totalCalorie, totalMinutesManual, totalCalorieManual, createdAt
+//   date, place,
+//   blocks: [ 적은 순서대로 쌓은 운동 블록
+//     { type: "cardio",   name, durationSec, course, distanceKm, calorie, avgHr }
+//     { type: "strength", durationSec, exercises: [{ name, sets: [{ kg, reps, sets }] }], calorie, avgHr }
+//     { type: "other",    name, durationSec, reps, sets, calorie, memo }
+//   ],
+//   totalSec, totalCalorie, totalTimeManual, totalCalorieManual, createdAt
+// 예전 형식(cardio/strength 두 칸 고정)은 workoutBlocksOf()가 blocks로 바꿔서 읽어요. 수정해서 저장하면 새 형식이 돼요.
 // 기록 양이 많지 않아서 전체를 한 번에 구독하고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요
 let editingWorkoutId = null;
 let editingWorkoutCreatedAt = null;
-let workoutBlocks = { cardio: false, strength: false }; // 모달에서 켠 블록
-let exerciseDraft = [];                                 // [{ name, sets: [{ kg, reps, sets }] }]
+let blockDraft = [];            // 모달에서 편집 중인 블록들 (입력값은 문자열 그대로 들고 있다가 저장할 때 숫자로 바꿈)
+let totalTimeManual = false;    // 합계를 직접 고쳤으면 자동 합계로 덮어쓰지 않아요
+let totalCalorieManual = false;
+
+const BLOCK_TYPES = {
+  cardio:   { emoji: "🏃", label: "유산소" },
+  strength: { emoji: "🏋️", label: "근력" },
+  other:    { emoji: "🧘", label: "기타" }
+};
+const SECOND_OPTIONS = [0, 10, 20, 30, 40, 50];
+const BLOCK_MAX_MINUTES = 180;
+const TOTAL_MAX_MINUTES = 300;
 
 function subscribeToWorkouts() {
   if (workoutsUnsub) workoutsUnsub();
@@ -1323,14 +1339,62 @@ function createdAtMs(w) {
   return w.createdAt && w.createdAt.toMillis ? w.createdAt.toMillis() : 0;
 }
 
-// 목록 한 줄 요약: "🏃 인터벌 러닝 20분 · 🏋️ 근력 21분 · 총 335kcal"
-function formatWorkoutSummary(w) {
-  const parts = [];
+// 예전 형식(cardio/strength)도 blocks 모양으로 맞춰서 돌려줘요
+function workoutBlocksOf(w) {
+  if (Array.isArray(w.blocks)) return w.blocks;
+  const toSec = (m) => (typeof m === "number" ? Math.round(m * 60) : null);
+  const blocks = [];
   if (w.cardio) {
-    parts.push(`🏃 ${w.cardio.type || "유산소"}${w.cardio.minutes ? ` ${formatAmount(w.cardio.minutes)}분` : ""}`);
+    blocks.push({
+      type: "cardio", name: w.cardio.type || "", durationSec: toSec(w.cardio.minutes),
+      course: w.cardio.course || "", distanceKm: w.cardio.distanceKm ?? null,
+      calorie: w.cardio.totalCalorie ?? w.cardio.calorie ?? null, avgHr: w.cardio.avgHr ?? null
+    });
   }
   if (w.strength) {
-    parts.push(`🏋️ 근력${w.strength.minutes ? ` ${formatAmount(w.strength.minutes)}분` : ""}`);
+    blocks.push({
+      type: "strength", durationSec: toSec(w.strength.minutes), exercises: w.strength.exercises || [],
+      calorie: w.strength.totalCalorie ?? w.strength.calorie ?? null, avgHr: w.strength.avgHr ?? null
+    });
+  }
+  return blocks;
+}
+
+function workoutTotalSec(w) {
+  if (typeof w.totalSec === "number") return w.totalSec;
+  if (typeof w.totalMinutes === "number") return Math.round(w.totalMinutes * 60);
+  return null;
+}
+
+function strengthExercisesOf(w) {
+  return workoutBlocksOf(w).filter(b => b.type === "strength").flatMap(b => b.exercises || []);
+}
+
+// 1250초 → "20분 50초", 1200초 → "20분"
+function formatDuration(sec) {
+  if (!sec) return "";
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  if (m && s) return `${m}분 ${s}초`;
+  return s ? `${s}초` : `${m}분`;
+}
+
+const sumBlockSec = (blocks) => blocks.reduce((sum, b) => sum + (b.durationSec || 0), 0);
+
+// 목록 한 줄 요약: "🏃 인터벌 러닝 20분 · 🏋️ 근력 21분 · 🧘 웜업/쿨다운 10분 · 총 335kcal"
+// 유산소는 종류마다 따로, 근력·기타는 각각 한 덩어리로 묶어서 보여줘요
+function formatWorkoutSummary(w) {
+  const blocks = workoutBlocksOf(w);
+  const dur = (sec) => (sec ? ` ${formatDuration(sec)}` : "");
+  const parts = [];
+  blocks.filter(b => b.type === "cardio").forEach(b => {
+    parts.push(`🏃 ${b.name || "유산소"}${dur(b.durationSec)}`);
+  });
+  const strength = blocks.filter(b => b.type === "strength");
+  if (strength.length) parts.push(`🏋️ 근력${dur(sumBlockSec(strength))}`);
+  const others = blocks.filter(b => b.type === "other");
+  if (others.length) {
+    const names = [...new Set(others.map(b => (b.name || "").trim()).filter(Boolean))];
+    parts.push(`🧘 ${names.join("/") || "기타"}${dur(sumBlockSec(others))}`);
   }
   if (w.totalCalorie) parts.push(`총 ${Math.round(w.totalCalorie)}kcal`);
   return parts.join(" · ");
@@ -1347,12 +1411,12 @@ function renderWorkoutList() {
     return;
   }
   list.innerHTML = items.map(w => {
-    const exerciseNames = (w.strength?.exercises || []).map(ex => ex.name).filter(Boolean);
+    const exerciseNames = strengthExercisesOf(w).map(ex => ex.name).filter(Boolean);
     const detail = [w.place, exerciseNames.join(", ")].filter(Boolean).join(" · ");
     return `
       <li>
         <button class="workout-edit-trigger" data-workout-edit="${w.id}">
-          <span class="workout-summary">${escapeHtml(formatWorkoutSummary(w))}</span>
+          <span class="workout-summary">${escapeHtml(formatWorkoutSummary(w) || "운동 기록")}</span>
           ${detail ? `<span class="workout-detail">${escapeHtml(detail)}</span>` : ""}
         </button>
         <button class="food-remove" data-workout-remove="${w.id}">삭제</button>
@@ -1375,129 +1439,290 @@ function renderWorkoutList() {
 }
 
 // ----- 운동 기록 모달 -----
-const numOrNull = (id) => {
-  const v = document.getElementById(id).value.trim();
-  return v === "" ? null : Number(v);
+const strOf = (v) => (v === null || v === undefined ? "" : String(v));
+const numOf = (v) => {
+  const s = strOf(v).trim();
+  return s === "" ? null : Number(s);
 };
-const setVal = (id, v) => { document.getElementById(id).value = v ?? ""; };
-
-function setWorkoutBlock(block, on) {
-  workoutBlocks[block] = on;
-  document.getElementById(`${block}-block`).style.display = on ? "flex" : "none";
-  document.querySelector(`.pill-toggle[data-block="${block}"]`).classList.toggle("active", on);
-  if (on && block === "strength" && exerciseDraft.length === 0) {
-    exerciseDraft.push(newExercise());
-    renderExerciseList();
-  }
-  updateWorkoutTotals();
-}
-
-document.querySelectorAll(".pill-toggle[data-block]").forEach(btn => {
-  btn.addEventListener("click", () => setWorkoutBlock(btn.dataset.block, !workoutBlocks[btn.dataset.block]));
-});
 
 function newExercise() {
   return { name: "", sets: [{ kg: "", reps: "", sets: "" }] };
 }
 
-function renderExerciseList() {
-  const el = document.getElementById("exercise-list");
-  el.innerHTML = exerciseDraft.map((ex, i) => `
-    <div class="exercise-item">
-      <div class="exercise-head">
-        <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
-          data-ex="${i}" data-field="name" list="exercise-name-options">
-        <button type="button" class="food-remove" data-ex-remove="${i}">삭제</button>
-      </div>
-      <div class="set-row set-row-labels"><span>무게 (kg)</span><span>횟수</span><span>세트</span><span></span></div>
-      ${ex.sets.map((g, j) => `
-        <div class="set-row">
-          <input type="number" step="any" inputmode="decimal" value="${g.kg ?? ""}" data-ex="${i}" data-set="${j}" data-field="kg">
-          <input type="number" step="1" inputmode="numeric" value="${g.reps ?? ""}" data-ex="${i}" data-set="${j}" data-field="reps">
-          <input type="number" step="1" inputmode="numeric" value="${g.sets ?? ""}" data-ex="${i}" data-set="${j}" data-field="sets">
-          <button type="button" class="extra-remove" data-set-remove="${i}-${j}" aria-label="이 무게 삭제"
-            ${ex.sets.length === 1 ? "disabled" : ""}>×</button>
-        </div>`).join("")}
-      <button type="button" class="btn-text" data-set-add="${i}">+ 무게 추가</button>
+// 저장된 블록 → 편집용 초안. 초 드롭다운이 10초 단위라, 딱 안 맞는 예전 값은 가까운 10초로 맞춰요
+function blockToDraft(b) {
+  const sec = Math.round((b.durationSec || 0) / 10) * 10;
+  return {
+    type: BLOCK_TYPES[b.type] ? b.type : "other",
+    name: b.name || "", course: b.course || "", memo: b.memo || "",
+    min: String(Math.floor(sec / 60)), sec: String(sec % 60),
+    distanceKm: strOf(b.distanceKm), calorie: strOf(b.calorie), avgHr: strOf(b.avgHr),
+    reps: strOf(b.reps), sets: strOf(b.sets),
+    exercises: (b.exercises || []).map(ex => ({
+      name: ex.name || "",
+      sets: (ex.sets && ex.sets.length ? ex.sets : [{}]).map(g => ({ kg: strOf(g.kg), reps: strOf(g.reps), sets: strOf(g.sets) }))
+    }))
+  };
+}
+
+function newBlock(type) {
+  const d = blockToDraft({ type });
+  if (type === "strength") d.exercises = [newExercise()];
+  return d;
+}
+
+const draftSec = (d) => (Number(d.min) || 0) * 60 + (Number(d.sec) || 0);
+
+function blockHasInput(d) {
+  return draftSec(d) > 0 ||
+    ["name", "course", "memo", "distanceKm", "calorie", "avgHr", "reps", "sets"].some(f => strOf(d[f]).trim() !== "") ||
+    d.exercises.some(ex => ex.name.trim() || ex.sets.some(g => g.kg !== "" || g.reps !== "" || g.sets !== ""));
+}
+
+function minuteOptions(max, selected) {
+  const sel = Number(selected) || 0;
+  let html = "";
+  for (let m = 0; m <= Math.max(max, sel); m++) {
+    html += `<option value="${m}"${m === sel ? " selected" : ""}>${m}</option>`;
+  }
+  return html;
+}
+
+function secondOptions(selected) {
+  const sel = Number(selected) || 0;
+  return SECOND_OPTIONS.map(s => `<option value="${s}"${s === sel ? " selected" : ""}>${s}</option>`).join("");
+}
+
+// ----- 블록 그리기 -----
+const bind = (i, f) => `data-b="${i}" data-f="${f}"`;
+
+function timeField(d, i) {
+  return `
+    <div class="field field-wide">시간
+      <span class="time-selects">
+        <select ${bind(i, "min")} aria-label="분">${minuteOptions(BLOCK_MAX_MINUTES, d.min)}</select><span>분</span>
+        <select ${bind(i, "sec")} aria-label="초">${secondOptions(d.sec)}</select><span>초</span>
+      </span>
+    </div>`;
+}
+
+function numField(d, i, f, label, step = "any") {
+  const mode = step === "1" ? "numeric" : "decimal";
+  return `<label>${label}<input type="number" step="${step}" inputmode="${mode}" value="${escapeHtml(d[f])}" ${bind(i, f)}></label>`;
+}
+
+function renderExercises(d, i) {
+  return `
+    <div class="exercise-list">${d.exercises.map((ex, k) => `
+      <div class="exercise-item">
+        <div class="exercise-head">
+          <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
+            ${bind(i, "name")} data-ex="${k}" list="exercise-name-options">
+          <button type="button" class="food-remove" data-act="remove-ex" data-b="${i}" data-ex="${k}">삭제</button>
+        </div>
+        <div class="set-row set-row-labels"><span>무게 (kg)</span><span>횟수</span><span>세트</span><span></span></div>
+        ${ex.sets.map((g, j) => `
+          <div class="set-row">
+            <input type="number" step="any" inputmode="decimal" value="${escapeHtml(g.kg)}" ${bind(i, "kg")} data-ex="${k}" data-set="${j}">
+            <input type="number" step="1" inputmode="numeric" value="${escapeHtml(g.reps)}" ${bind(i, "reps")} data-ex="${k}" data-set="${j}">
+            <input type="number" step="1" inputmode="numeric" value="${escapeHtml(g.sets)}" ${bind(i, "sets")} data-ex="${k}" data-set="${j}">
+            <button type="button" class="extra-remove" data-act="remove-set" data-b="${i}" data-ex="${k}" data-set="${j}"
+              aria-label="이 무게 삭제" ${ex.sets.length === 1 ? "disabled" : ""}>×</button>
+          </div>`).join("")}
+        <button type="button" class="btn-text" data-act="add-set" data-b="${i}" data-ex="${k}">+ 무게 추가</button>
+      </div>`).join("")}
     </div>
-  `).join("") + `<datalist id="exercise-name-options">${
+    <button type="button" class="btn-secondary" data-act="add-ex" data-b="${i}">+ 운동 추가</button>`;
+}
+
+function renderBlockBody(d, i) {
+  if (d.type === "cardio") {
+    return `
+      <input type="text" placeholder="운동 종류 (예: 인터벌 러닝)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+      <div class="field-grid">${timeField(d, i)}</div>
+      <textarea rows="2" placeholder="코스/프로그램 메모 (예: 마이마운틴 미디움 2번 코스, 3.0-4.5-6.0-8.5 반복*2)" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
+      <div class="field-grid">
+        ${numField(d, i, "distanceKm", "거리 (km, 선택)")}
+        ${numField(d, i, "calorie", "소모 칼로리 (kcal)")}
+        ${numField(d, i, "avgHr", "평균 심박수 (bpm, 선택)")}
+      </div>`;
+  }
+  if (d.type === "strength") {
+    return `
+      <div class="field-grid">${timeField(d, i)}</div>
+      ${renderExercises(d, i)}
+      <div class="field-grid">
+        ${numField(d, i, "calorie", "소모 칼로리 (kcal)")}
+        ${numField(d, i, "avgHr", "평균 심박수 (bpm, 선택)")}
+      </div>`;
+  }
+  return `
+    <input type="text" placeholder="이름 (예: 웜업, 턱걸이 연습, 쿨다운 스트레칭)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+    <div class="field-grid">
+      ${timeField(d, i)}
+      ${numField(d, i, "reps", "횟수 (선택)", "1")}
+      ${numField(d, i, "sets", "세트 (선택)", "1")}
+      ${numField(d, i, "calorie", "소모 칼로리 (선택)")}
+    </div>
+    <textarea rows="2" placeholder="메모 (선택)" ${bind(i, "memo")}>${escapeHtml(d.memo)}</textarea>`;
+}
+
+function renderWorkoutBlocks() {
+  const el = document.getElementById("workout-blocks");
+  el.innerHTML = blockDraft.map((d, i) => `
+    <div class="workout-block" data-block-index="${i}">
+      <div class="block-type-tabs" role="group" aria-label="블록 유형">${
+        Object.entries(BLOCK_TYPES).map(([type, t]) => `
+          <button type="button" class="block-type-tab${d.type === type ? " active" : ""}"
+            data-act="type" data-b="${i}" data-type="${type}">${t.emoji} ${t.label}</button>`).join("")
+      }</div>
+      ${renderBlockBody(d, i)}
+      <div class="block-actions">
+        <button type="button" class="btn-text" data-act="up" data-b="${i}" ${i === 0 ? "disabled" : ""}>↑ 위로</button>
+        <button type="button" class="btn-text" data-act="down" data-b="${i}" ${i === blockDraft.length - 1 ? "disabled" : ""}>↓ 아래로</button>
+        <button type="button" class="btn-text block-remove" data-act="remove" data-b="${i}">블록 삭제</button>
+      </div>
+    </div>`).join("") + `<datalist id="exercise-name-options">${
     getExerciseNames().map(n => `<option value="${escapeHtml(n)}">`).join("")
   }</datalist>`;
 }
 
-// 입력은 상태(exerciseDraft)에만 반영 — 매번 다시 그리면 휴대폰 키보드가 닫혀서, 추가/삭제할 때만 다시 그림
-document.getElementById("exercise-list").addEventListener("input", (e) => {
+// 입력은 상태(blockDraft)에만 반영 — 매번 다시 그리면 휴대폰 키보드가 닫혀서, 추가/삭제할 때만 다시 그림
+function onBlockInput(e) {
   const t = e.target;
-  if (t.dataset.ex === undefined) return;
-  const ex = exerciseDraft[Number(t.dataset.ex)];
-  if (t.dataset.field === "name") ex.name = t.value;
-  else ex.sets[Number(t.dataset.set)][t.dataset.field] = t.value;
-});
-
-document.getElementById("exercise-list").addEventListener("click", (e) => {
-  const t = e.target;
-  if (t.dataset.exRemove !== undefined) {
-    exerciseDraft.splice(Number(t.dataset.exRemove), 1);
-  } else if (t.dataset.setAdd !== undefined) {
-    // 무게만 바꿔서 이어가는 경우가 많아서, 횟수·세트는 바로 위 값을 그대로 채워 줌
-    const sets = exerciseDraft[Number(t.dataset.setAdd)].sets;
-    const last = sets[sets.length - 1] || {};
-    sets.push({ kg: "", reps: last.reps ?? "", sets: last.sets ?? "" });
-  } else if (t.dataset.setRemove !== undefined) {
-    const [i, j] = t.dataset.setRemove.split("-").map(Number);
-    exerciseDraft[i].sets.splice(j, 1);
+  if (t.dataset.b === undefined || t.dataset.f === undefined) return;
+  const d = blockDraft[Number(t.dataset.b)];
+  if (!d) return;
+  if (t.dataset.ex !== undefined) {
+    const ex = d.exercises[Number(t.dataset.ex)];
+    if (t.dataset.set === undefined) ex.name = t.value;
+    else ex.sets[Number(t.dataset.set)][t.dataset.f] = t.value;
   } else {
-    return;
+    d[t.dataset.f] = t.value;
   }
-  renderExerciseList();
+  updateWorkoutTotals();
+}
+document.getElementById("workout-blocks").addEventListener("input", onBlockInput);
+document.getElementById("workout-blocks").addEventListener("change", onBlockInput);
+
+document.getElementById("workout-blocks").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-act]");
+  if (!t || t.disabled) return;
+  const i = Number(t.dataset.b);
+  const d = blockDraft[i];
+  if (!d) return;
+  const k = Number(t.dataset.ex);
+  let focusSelector = null;
+  switch (t.dataset.act) {
+    case "type":
+      d.type = t.dataset.type;
+      if (d.type === "strength" && d.exercises.length === 0) d.exercises.push(newExercise());
+      break;
+    case "up":
+    case "down": {
+      const j = t.dataset.act === "up" ? i - 1 : i + 1;
+      [blockDraft[i], blockDraft[j]] = [blockDraft[j], blockDraft[i]];
+      break;
+    }
+    case "remove":
+      if (blockHasInput(d) && !confirm("이 블록을 삭제할까요?")) return;
+      blockDraft.splice(i, 1);
+      if (blockDraft.length === 0) document.getElementById("block-type-picker").style.display = "flex";
+      break;
+    case "add-ex":
+      d.exercises.push(newExercise());
+      focusSelector = `[data-b="${i}"][data-f="name"][data-ex="${d.exercises.length - 1}"]`;
+      break;
+    case "remove-ex":
+      d.exercises.splice(k, 1);
+      break;
+    case "add-set": {
+      // 무게만 바꿔서 이어가는 경우가 많아서, 횟수·세트는 바로 위 값을 그대로 채워 줌
+      const sets = d.exercises[k].sets;
+      const last = sets[sets.length - 1] || {};
+      sets.push({ kg: "", reps: last.reps ?? "", sets: last.sets ?? "" });
+      focusSelector = `[data-b="${i}"][data-f="kg"][data-ex="${k}"][data-set="${sets.length - 1}"]`;
+      break;
+    }
+    case "remove-set":
+      d.exercises[k].sets.splice(Number(t.dataset.set), 1);
+      break;
+    default:
+      return;
+  }
+  renderWorkoutBlocks();
+  updateWorkoutTotals();
+  if (focusSelector) document.querySelector(`#workout-blocks ${focusSelector}`)?.focus();
 });
 
-document.getElementById("add-exercise-btn").addEventListener("click", () => {
-  exerciseDraft.push(newExercise());
-  renderExerciseList();
-  const inputs = document.querySelectorAll('#exercise-list [data-field="name"]');
-  inputs[inputs.length - 1]?.focus();
+document.getElementById("add-block-btn").addEventListener("click", () => {
+  const picker = document.getElementById("block-type-picker");
+  picker.style.display = picker.style.display === "none" ? "flex" : "none";
 });
 
-// 합계 자동 계산: 켜진 블록의 시간을 더하고, 칼로리는 "총 소모 칼로리"가 있으면 그걸, 없으면 "소모 칼로리"를 더함
-function autoWorkoutTotals() {
-  let minutes = 0, calorie = 0;
-  ["cardio", "strength"].forEach(block => {
-    if (!workoutBlocks[block]) return;
-    minutes += numOrNull(`${block}-minutes`) || 0;
-    calorie += numOrNull(`${block}-total-calorie`) ?? numOrNull(`${block}-calorie`) ?? 0;
+document.querySelectorAll("[data-add-block]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    blockDraft.push(newBlock(btn.dataset.addBlock));
+    document.getElementById("block-type-picker").style.display = "none";
+    renderWorkoutBlocks();
+    updateWorkoutTotals();
+    document.querySelector(`#workout-blocks [data-block-index="${blockDraft.length - 1}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  return { minutes, calorie: Math.round(calorie) };
+});
+
+// ----- 합계 (자동으로 더하지만 직접 고칠 수 있음) -----
+function autoWorkoutTotals() {
+  let sec = 0, calorie = 0;
+  blockDraft.forEach(d => {
+    sec += draftSec(d);
+    calorie += Number(d.calorie) || 0;
+  });
+  return { sec, calorie: Math.round(calorie) };
+}
+
+function setTotalTime(sec) {
+  const r = Math.round((sec || 0) / 10) * 10;
+  const minEl = document.getElementById("workout-total-min");
+  const m = Math.floor(r / 60);
+  if (m >= minEl.options.length) minEl.innerHTML = minuteOptions(m, m);
+  minEl.value = String(m);
+  document.getElementById("workout-total-sec").value = String(r % 60);
+}
+
+function totalTimeSec() {
+  return (Number(document.getElementById("workout-total-min").value) || 0) * 60 +
+    (Number(document.getElementById("workout-total-sec").value) || 0);
 }
 
 function updateWorkoutTotals() {
   const auto = autoWorkoutTotals();
-  const minEl = document.getElementById("workout-total-minutes");
   const calEl = document.getElementById("workout-total-calorie");
-  if (!minEl.dataset.manual) minEl.value = auto.minutes || "";
-  if (!calEl.dataset.manual) calEl.value = auto.calorie || "";
+  if (!totalTimeManual) setTotalTime(auto.sec);
+  if (!totalCalorieManual) calEl.value = auto.calorie || "";
   document.getElementById("workout-total-reset").style.display =
-    (minEl.dataset.manual || calEl.dataset.manual) ? "inline" : "none";
+    (totalTimeManual || totalCalorieManual) ? "inline" : "none";
 }
 
-["cardio-minutes", "cardio-calorie", "cardio-total-calorie",
- "strength-minutes", "strength-calorie", "strength-total-calorie"].forEach(id => {
-  document.getElementById(id).addEventListener("input", updateWorkoutTotals);
-});
+document.getElementById("workout-total-min").innerHTML = minuteOptions(TOTAL_MAX_MINUTES, 0);
+document.getElementById("workout-total-sec").innerHTML = secondOptions(0);
 
-// 합계 칸을 직접 고치면 그 값을 유지 (비우면 다시 자동 계산)
-["workout-total-minutes", "workout-total-calorie"].forEach(id => {
-  const el = document.getElementById(id);
-  el.addEventListener("input", () => {
-    if (el.value.trim() === "") delete el.dataset.manual;
-    else el.dataset.manual = "1";
+["workout-total-min", "workout-total-sec"].forEach(id => {
+  document.getElementById(id).addEventListener("change", () => {
+    totalTimeManual = true;
     updateWorkoutTotals();
   });
 });
 
+// 칼로리 합계를 직접 고치면 그 값을 유지 (비우면 다시 자동 계산)
+document.getElementById("workout-total-calorie").addEventListener("input", (e) => {
+  totalCalorieManual = e.target.value.trim() !== "";
+  updateWorkoutTotals();
+});
+
 document.getElementById("workout-total-reset").addEventListener("click", () => {
-  delete document.getElementById("workout-total-minutes").dataset.manual;
-  delete document.getElementById("workout-total-calorie").dataset.manual;
+  totalTimeManual = false;
+  totalCalorieManual = false;
   updateWorkoutTotals();
 });
 
@@ -1506,91 +1731,66 @@ function openWorkoutModal(w = null) {
   editingWorkoutCreatedAt = w ? (w.createdAt || null) : null;
   document.getElementById("workout-modal-title").textContent = w ? "운동 기록 수정" : "운동 기록 추가";
   document.getElementById("workout-error").textContent = "";
-  setVal("workout-place", w?.place);
+  document.getElementById("workout-place").value = w?.place ?? "";
 
-  const c = w?.cardio || {};
-  setVal("cardio-type", c.type);
-  setVal("cardio-course", c.course);
-  setVal("cardio-minutes", c.minutes);
-  setVal("cardio-distance", c.distanceKm);
-  setVal("cardio-calorie", c.calorie);
-  setVal("cardio-total-calorie", c.totalCalorie);
-  setVal("cardio-hr", c.avgHr);
+  blockDraft = w ? workoutBlocksOf(w).map(blockToDraft) : [];
+  renderWorkoutBlocks();
+  // 새 기록은 블록이 없으니 유형 고르는 버튼을 바로 펼쳐 둬요
+  document.getElementById("block-type-picker").style.display = blockDraft.length ? "none" : "flex";
 
-  const st = w?.strength || {};
-  setVal("strength-minutes", st.minutes);
-  setVal("strength-calorie", st.calorie);
-  setVal("strength-total-calorie", st.totalCalorie);
-  setVal("strength-hr", st.avgHr);
-  exerciseDraft = (st.exercises || []).map(ex => ({
-    name: ex.name || "",
-    sets: (ex.sets && ex.sets.length ? ex.sets : [{}]).map(g => ({ kg: g.kg ?? "", reps: g.reps ?? "", sets: g.sets ?? "" }))
-  }));
-  renderExerciseList();
-
-  const minEl = document.getElementById("workout-total-minutes");
-  const calEl = document.getElementById("workout-total-calorie");
-  delete minEl.dataset.manual;
-  delete calEl.dataset.manual;
-  if (w?.totalMinutesManual) { minEl.dataset.manual = "1"; minEl.value = w.totalMinutes ?? ""; }
-  if (w?.totalCalorieManual) { calEl.dataset.manual = "1"; calEl.value = w.totalCalorie ?? ""; }
-
-  // 새 기록은 둘 다 켠 상태로 시작 (헬스장에서는 보통 둘 다 해서) — 안 한 쪽은 눌러서 끄면 돼요
-  setWorkoutBlock("cardio", w ? !!w.cardio : true);
-  setWorkoutBlock("strength", w ? !!w.strength : true);
+  totalTimeManual = !!(w && (w.totalTimeManual ?? w.totalMinutesManual));
+  totalCalorieManual = !!(w && w.totalCalorieManual);
+  if (totalTimeManual) setTotalTime(workoutTotalSec(w) || 0);
+  if (totalCalorieManual) document.getElementById("workout-total-calorie").value = w.totalCalorie ?? "";
+  updateWorkoutTotals();
   openModal("workout-modal");
 }
 
 document.getElementById("add-workout-btn").addEventListener("click", () => openWorkoutModal());
 document.getElementById("workout-close").addEventListener("click", () => closeModal("workout-modal"));
 
-function collectExercises() {
-  const toNum = v => (v === "" || v === null || v === undefined) ? null : Number(v);
-  return exerciseDraft
+function collectExercises(exercises) {
+  return exercises
     .map(ex => ({
       name: ex.name.trim(),
       sets: ex.sets
-        .map(g => ({ kg: toNum(g.kg), reps: toNum(g.reps), sets: toNum(g.sets) }))
+        .map(g => ({ kg: numOf(g.kg), reps: numOf(g.reps), sets: numOf(g.sets) }))
         .filter(g => g.kg !== null || g.reps !== null || g.sets !== null)
     }))
     .filter(ex => ex.name || ex.sets.length);
 }
 
+// 편집용 초안 → 저장할 블록 (유형에 맞는 칸만 남기고, 비운 칸은 null)
+function collectBlock(d) {
+  const base = { type: d.type, durationSec: draftSec(d) || null, calorie: numOf(d.calorie) };
+  if (d.type === "cardio") {
+    return { ...base, name: d.name.trim(), course: d.course.trim(), distanceKm: numOf(d.distanceKm), avgHr: numOf(d.avgHr) };
+  }
+  if (d.type === "strength") {
+    return { ...base, exercises: collectExercises(d.exercises), avgHr: numOf(d.avgHr) };
+  }
+  return { ...base, name: d.name.trim(), reps: numOf(d.reps), sets: numOf(d.sets), memo: d.memo.trim() };
+}
+
 document.getElementById("workout-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const errEl = document.getElementById("workout-error");
-  if (!workoutBlocks.cardio && !workoutBlocks.strength) {
-    errEl.textContent = "유산소나 근력운동 중 하나는 켜 주세요.";
+  if (blockDraft.length === 0) {
+    errEl.textContent = "운동 블록을 하나 이상 추가해 주세요.";
     return;
   }
-  const minEl = document.getElementById("workout-total-minutes");
-  const calEl = document.getElementById("workout-total-calorie");
   const data = {
     date: editingWorkoutId ? allWorkouts.find(w => w.id === editingWorkoutId)?.date || currentDate : currentDate,
     place: document.getElementById("workout-place").value.trim(),
-    cardio: workoutBlocks.cardio ? {
-      type: document.getElementById("cardio-type").value.trim(),
-      course: document.getElementById("cardio-course").value.trim(),
-      minutes: numOrNull("cardio-minutes"),
-      distanceKm: numOrNull("cardio-distance"),
-      calorie: numOrNull("cardio-calorie"),
-      totalCalorie: numOrNull("cardio-total-calorie"),
-      avgHr: numOrNull("cardio-hr")
-    } : null,
-    strength: workoutBlocks.strength ? {
-      minutes: numOrNull("strength-minutes"),
-      exercises: collectExercises(),
-      calorie: numOrNull("strength-calorie"),
-      totalCalorie: numOrNull("strength-total-calorie"),
-      avgHr: numOrNull("strength-hr")
-    } : null,
-    totalMinutes: numOrNull("workout-total-minutes"),
-    totalCalorie: numOrNull("workout-total-calorie"),
-    totalMinutesManual: !!minEl.dataset.manual,
-    totalCalorieManual: !!calEl.dataset.manual
+    blocks: blockDraft.map(collectBlock),
+    totalSec: totalTimeSec() || null,
+    totalCalorie: numOf(document.getElementById("workout-total-calorie").value),
+    totalTimeManual,
+    totalCalorieManual
   };
   try {
     if (editingWorkoutId) {
+      // setDoc으로 통째로 덮어써서, 예전 형식(cardio/strength) 칸은 이때 사라져요
       await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "workouts", editingWorkoutId), {
         ...data, createdAt: editingWorkoutCreatedAt || fb.serverTimestamp()
       });
@@ -1609,7 +1809,7 @@ document.getElementById("workout-form").addEventListener("submit", async (e) => 
 // ----- 무게 추이 (종목별 날짜마다 최고 무게) -----
 function getExerciseNames() {
   const names = new Set();
-  allWorkouts.forEach(w => (w.strength?.exercises || []).forEach(ex => {
+  allWorkouts.forEach(w => strengthExercisesOf(w).forEach(ex => {
     if (ex.name && ex.name.trim()) names.add(ex.name.trim());
   }));
   return [...names].sort((a, b) => a.localeCompare(b, "ko"));
@@ -1629,7 +1829,7 @@ document.getElementById("progress-exercise").addEventListener("change", renderPr
 
 function maxWeightByDate(name) {
   const byDate = {};
-  allWorkouts.forEach(w => (w.strength?.exercises || []).forEach(ex => {
+  allWorkouts.forEach(w => strengthExercisesOf(w).forEach(ex => {
     if ((ex.name || "").trim() !== name) return;
     (ex.sets || []).forEach(g => {
       if (typeof g.kg === "number" && (byDate[w.date] === undefined || g.kg > byDate[w.date])) byDate[w.date] = g.kg;

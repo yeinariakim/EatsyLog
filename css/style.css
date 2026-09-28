@@ -572,6 +572,36 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   resize: vertical;
 }
 .workout-form textarea:focus { border-color: var(--accent); }
+.workout-blocks { display: flex; flex-direction: column; gap: 12px; }
+.workout-blocks:empty { display: none; }
+.block-type-picker { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.block-type-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 4px;
+}
+.block-type-tab {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.block-type-tab.active { background: var(--accent); color: #fff; }
+.block-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.block-actions .btn-text { padding: 2px 0; font-size: 12px; }
+.block-actions .btn-text:disabled { opacity: 0.3; cursor: default; }
+.block-actions .block-remove { color: var(--warn); }
+.time-selects { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 14px; }
+.time-selects select { width: auto; flex: 1; min-width: 0; }
 .pill-toggles { display: flex; gap: 8px; }
 .pill-toggle {
   font-family: var(--font);
@@ -603,7 +633,8 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
-.field-grid label {
+.field-grid .field-wide { grid-column: 1 / -1; }
+.field-grid label, .field-grid .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -642,6 +673,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .set-row-labels span { font-size: 11px; color: var(--text-soft); text-align: center; }
 .extra-remove:disabled { opacity: 0.3; cursor: default; }
 .exercise-item .btn-text { padding: 4px 0; font-size: 13px; color: var(--accent); }
+.exercise-list + .btn-secondary { align-self: flex-start; }
 .workout-total-hint { font-size: 11px; color: var(--text-soft); margin: 0; line-height: 1.5; }
 .workout-total-hint .btn-text { padding: 0; font-size: 11px; }
 
@@ -991,3 +1023,8 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   font-size: 13px;
   color: var(--text-soft);
 }
+
+/* ---------- 입력칸 글자 크기 안전장치 ----------
+   아이폰 사파리는 16px보다 작은 입력칸을 누르면 화면을 자동으로 확대해요.
+   위에서 어떤 크기를 주든 입력칸은 항상 16px 이상이 되도록 맨 끝에서 한 번 더 고정해요. */
+input, select, textarea { font-size: 16px !important; }

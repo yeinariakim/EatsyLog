@@ -71,8 +71,10 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
    양을 바꾸면 비율대로 같이 바뀌고, 하루 합계는 이름별로 더해서 홈에 보여줘요.
 6. 홈·체중·운동 탭은 위쪽 날짜 이동(‹ 오늘 ›)을 같이 써요. 날짜 라벨을 누르면 작은 날짜 선택 창(`openDatePicker()`)이 떠요.
    날짜는 항상 `setCurrentDate()`로 바꿔요 (오늘 이후는 막혀 있음).
-   **운동** 탭은 그 날짜의 운동 기록을 보여줘요. 기록은 유산소·근력운동 블록을 켜고 끄며 입력하고,
-   근력운동은 종목마다 여러 무게(세트 그룹)를 적어요. 총 시간·칼로리는 자동으로 더하지만 직접 고칠 수 있어요.
+   **운동** 탭은 그 날짜의 운동 기록을 보여줘요. 기록 하나는 "운동 블록" 여러 개를 순서대로 쌓아 만들어요
+   (유산소 / 근력운동 / 기타 중 골라서 원하는 만큼 추가·삭제·순서 바꾸기). 시간은 분·초(10초 단위) 드롭다운으로 적고,
+   근력운동은 종목마다 여러 무게(세트 그룹)를 적어요. 총 시간·칼로리는 모든 블록을 자동으로 더하지만 직접 고칠 수 있어요.
+   모달 입력값은 `blockDraft`에 문자열로 들고 있다가 저장할 때 숫자로 바꿔요.
    아래 "무게 추이"에서 종목을 고르면 날짜별 최고 무게를 차트로 보여줘요.
    (운동 기록은 전체를 한 번에 구독해서 `allWorkouts`에 두고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요)
 7. **달력** 탭은 한 달 기록을 구독해서 날짜별 칼로리 달성 정도를 작은 도넛링으로 보여줘요.
@@ -113,12 +115,16 @@ users/{uid}/favorites/{자동ID}
 
 users/{uid}/workouts/{자동ID}         운동 한 번 기록
   date, place,
-  cardio: { type, course, minutes, distanceKm, calorie, totalCalorie, avgHr } | null,
-  strength: { minutes, exercises: [{ name, sets: [{ kg, reps, sets }] }],
-              calorie, totalCalorie, avgHr } | null,
-  totalMinutes, totalCalorie,
-  totalMinutesManual, totalCalorieManual  (true면 자동 합계 대신 직접 적은 값), createdAt
-  (선택 칸을 비우면 null로 저장해요)
+  blocks: [ 적은 순서대로
+    { type: "cardio",   name, durationSec, course, distanceKm, calorie, avgHr }
+    { type: "strength", durationSec, exercises: [{ name, sets: [{ kg, reps, sets }] }], calorie, avgHr }
+    { type: "other",    name, durationSec, reps, sets, calorie, memo }   (웜업·쿨다운·맨몸운동 등)
+  ],
+  totalSec, totalCalorie,
+  totalTimeManual, totalCalorieManual  (true면 자동 합계 대신 직접 적은 값), createdAt
+  (선택 칸을 비우면 null로 저장해요. 시간은 모두 "초" 단위)
+  (예전 형식 cardio/strength/totalMinutes 문서는 workoutBlocksOf()·workoutTotalSec()가 읽을 때 바꿔 줘요.
+   수정해서 저장하면 새 형식으로 덮어써요)
 
 users/{uid}/fcmTokens/{token}
   token, updatedAt
