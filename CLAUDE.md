@@ -28,6 +28,13 @@
 - **`main`에 바로 올리지 마세요.** `main`은 GitHub Pages로 바로 배포돼서, 올리는 순간 실제 앱이 바뀌어요.
 - 항상 **새 브랜치에서 작업**하고, 끝나면 그 브랜치를 push한 뒤 **PR을 만들어 주세요.**
 - `main`에 합치는 건 PR을 확인한 다음에 해요.
+- **Firebase 규칙(`firestore.rules`)을 바꿔야 하면, PR 설명 맨 위에 크게 알려 주세요.**
+  `firestore.rules` 파일은 저장소에 올려도 Firebase에 자동으로 반영되지 않아요.
+  Firebase 콘솔 > Firestore Database > 규칙 탭에 직접 붙여넣어야 해요.
+  그래서 PR 설명 맨 위에 아래처럼 써 주세요.
+  - `## ⚠️ Firebase 규칙 변경 필요` 같은 큰 제목을 달아요.
+  - 무엇이 왜 바뀌는지 한두 줄로 설명해요.
+  - 콘솔에 그대로 붙여넣을 **전체 규칙**을 코드 블록으로 보여줘요. 바뀐 부분만 보여주면 안 돼요.
 
 ## 폴더 구조
 
@@ -117,7 +124,7 @@ users/{uid}/fcmTokens/{token}
   token, updatedAt
 ```
 
-새 컬렉션을 추가하면 `firestore.rules`에도 규칙을 꼭 추가해야 해요.
+새 컬렉션을 추가하면 `firestore.rules`에도 규칙을 꼭 추가해야 해요. (PR 설명 쓰는 법은 위 "작업 규칙" 참고)
 
 ## 수정할 때 주의할 점
 
