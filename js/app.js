@@ -615,7 +615,7 @@ function switchView(view) {
   document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";
   if (!currentUser) return;
   if (view === "weight") { renderWeightChart(); renderInbodyChart(); }
-  if (view === "workout") renderProgressChart(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
+  if (view === "workout") renderProgress(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
   if (view === "calendar") {
     calendarMonth = currentDate.slice(0, 7); // 홈에서 보던 날짜의 달부터 보여줌
     subscribeToCalendarMonth();
@@ -1380,9 +1380,8 @@ function subscribeToWorkouts() {
     allWorkouts = [];
     snap.forEach(d => allWorkouts.push({ id: d.id, ...d.data() }));
     renderWorkoutList();
-    renderProgressOptions();
     refreshDatePickerIfOpen();
-    if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
+    renderProgress();
   });
 }
 
@@ -2139,17 +2138,69 @@ function getExerciseNames() {
   return [...names].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
-function renderProgressOptions() {
-  const select = document.getElementById("progress-exercise");
-  const names = getExerciseNames();
-  const prev = select.value;
-  document.getElementById("progress-body").style.display = names.length ? "" : "none";
-  document.getElementById("progress-empty").style.display = names.length ? "none" : "";
-  select.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  if (names.includes(prev)) select.value = prev;
+// 종목마다 한 줄씩 미니 그래프(스파크라인) 목록을 보여주고, 줄을 누르면 그 종목만 큰 그래프로 보여줘요
+let progressSelected = null; // 크게 보고 있는 종목 이름 (null이면 목록)
+
+// 축·숫자 없이 선 모양만 그리는 작은 그래프. 가로는 기록 순서대로 같은 간격, 마지막(최근) 점만 동그랗게 찍어요
+function sparklineSvg(data) {
+  const W = 72, H = 24, PAD = 3;
+  const svg = (inner) => `<svg class="sparkline" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${inner}</svg>`;
+  if (data.length === 0) return svg("");
+  if (data.length === 1) return svg(`<circle cx="${W / 2}" cy="${H / 2}" r="3"></circle>`);
+  const kgs = data.map(d => d.kg);
+  const min = Math.min(...kgs), max = Math.max(...kgs);
+  const x = (i) => PAD + (W - PAD * 2) * i / (data.length - 1);
+  const y = (kg) => (max === min ? H / 2 : PAD + (H - PAD * 2) * (1 - (kg - min) / (max - min)));
+  const points = data.map((d, i) => `${x(i).toFixed(1)},${y(d.kg).toFixed(1)}`).join(" ");
+  const last = data[data.length - 1];
+  return svg(`<polyline points="${points}"></polyline>
+    <circle cx="${x(data.length - 1).toFixed(1)}" cy="${y(last.kg).toFixed(1)}" r="2.5"></circle>`);
 }
 
-document.getElementById("progress-exercise").addEventListener("change", renderProgressChart);
+function renderProgress() {
+  const names = getExerciseNames();
+  if (progressSelected && !names.includes(progressSelected)) progressSelected = null; // 그 종목 기록이 다 지워졌으면 목록으로
+  document.getElementById("progress-empty").style.display = names.length ? "none" : "";
+  document.getElementById("progress-list").style.display = names.length && !progressSelected ? "" : "none";
+  document.getElementById("progress-detail").style.display = progressSelected ? "" : "none";
+  if (progressSelected) {
+    // 숨겨진 캔버스에는 크기가 잘못 잡혀서, 운동 탭이 보일 때만 그려요 (탭을 열면 switchView가 다시 불러요)
+    if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
+    return;
+  }
+  if (progressChart) { progressChart.destroy(); progressChart = null; }
+
+  // 최근에 한 종목이 위로 오게
+  const lastDate = (data) => (data.length ? data[data.length - 1].date : "");
+  const rows = names.map(name => ({ name, data: maxWeightByDate(name) }))
+    .sort((a, b) => lastDate(b.data).localeCompare(lastDate(a.data)) || a.name.localeCompare(b.name, "ko"));
+  document.getElementById("progress-list").innerHTML = rows.map(({ name, data }) => {
+    const meta = data.length === 0 ? "무게 없음"
+      : data.length === 1 ? "기록 1회"
+      : `${formatAmount(data[data.length - 1].kg)}kg`;
+    return `
+      <li>
+        <button type="button" class="progress-row" data-progress-name="${escapeHtml(name)}">
+          <span class="progress-row-name">${escapeHtml(name)}</span>
+          ${sparklineSvg(data)}
+          <span class="progress-row-meta">${meta}</span>
+          <span class="progress-row-chevron" aria-hidden="true">›</span>
+        </button>
+      </li>`;
+  }).join("");
+}
+
+document.getElementById("progress-list").addEventListener("click", (e) => {
+  const row = e.target.closest("[data-progress-name]");
+  if (!row) return;
+  progressSelected = row.dataset.progressName;
+  renderProgress();
+});
+
+document.getElementById("progress-back").addEventListener("click", () => {
+  progressSelected = null;
+  renderProgress();
+});
 
 function maxWeightByDate(name) {
   const byDate = {};
@@ -2162,12 +2213,14 @@ function maxWeightByDate(name) {
   return Object.keys(byDate).sort().map(date => ({ date, kg: byDate[date] }));
 }
 
+// 큰 그래프: 날짜·kg 눈금이 다 있는 라인 그래프 (체중 탭 그래프와 같은 톤)
 function renderProgressChart() {
   const ctx = document.getElementById("progress-chart");
-  const name = document.getElementById("progress-exercise").value;
+  const name = progressSelected;
   if (!ctx || typeof Chart === "undefined") return;
   if (progressChart) { progressChart.destroy(); progressChart = null; }
   const summaryEl = document.getElementById("progress-summary");
+  document.getElementById("progress-detail-name").textContent = name || "";
   if (!name) { summaryEl.textContent = ""; return; }
 
   const data = maxWeightByDate(name);
