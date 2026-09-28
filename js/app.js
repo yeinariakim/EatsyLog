@@ -1510,9 +1510,12 @@ function renderWorkoutList() {
               <span class="workout-row-label">${escapeHtml(r.label)}</span>
               <span class="workout-row-value">${escapeHtml(formatTimeCalorie(r.sec, r.calorie))}</span>
             </span>`).join("")}
-          ${detail ? `<span class="workout-detail">${escapeHtml(detail)}</span>` : ""}
         </button>
-        <button class="food-remove" data-workout-remove="${w.id}">삭제</button>
+        <!-- 장소·종목 요약 + 삭제: 삭제가 첫 줄에 붙어 보이지 않게 맨 아래 줄 오른쪽 끝에 둬요 -->
+        <div class="workout-foot">
+          <button class="workout-detail" data-workout-edit="${w.id}">${escapeHtml(detail)}</button>
+          <button class="food-remove" data-workout-remove="${w.id}">삭제</button>
+        </div>
       </li>`;
   }).join("");
 
@@ -2204,7 +2207,7 @@ function renderProgress() {
           ${last
             ? `<span class="progress-row-kg">${formatAmount(last.kg)}<small>kg</small></span>`
             : `<span class="progress-row-none">무게 없음</span>`}
-          <span class="progress-row-change ${chg ? chg.cls : ""}">${chg ? chg.text : ""}</span>
+          <span class="progress-row-change">${chg ? `<span class="kg-change ${chg.cls}">${chg.text}</span>` : ""}</span>
           <span class="progress-row-chevron" aria-hidden="true">›</span>
         </button>
       </li>`;
