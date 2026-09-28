@@ -117,6 +117,7 @@
     </section>
 
     <p id="daily-summary" class="daily-summary">기록을 시작해보세요</p>
+    <div id="extras-summary" class="extras-summary"></div>
 
     <section class="meals">
       <div class="meal-block" data-meal="breakfast">
@@ -225,6 +226,23 @@
         <input type="number" id="computed-fat" placeholder="지방 (g)" step="any">
       </div>
 
+      <div class="extras-block">
+        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <div id="food-extras-list" class="extras-list"></div>
+        <div class="extras-add-row">
+          <input type="text" id="food-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="number" id="food-extra-value" placeholder="수치" step="any">
+          <select id="food-extra-unit">
+            <option value="">단위없음</option>
+            <option value="mg">mg</option>
+            <option value="g">g</option>
+            <option value="mcg">mcg</option>
+            <option value="ml">ml</option>
+          </select>
+          <button type="button" id="food-extra-add-btn" class="btn-text">+ 추가</button>
+        </div>
+      </div>
+
       <label class="checkbox-row"><input type="checkbox" id="food-favorite"> 즐겨찾기에 저장</label>
       <button id="add-food-btn" class="btn-primary">기록에 추가</button>
     </div>
@@ -245,6 +263,23 @@
         <input type="number" id="manual-carb" placeholder="탄수화물 (g)" step="any">
         <input type="number" id="manual-fat" placeholder="지방 (g)" step="any">
       </div>
+      <div class="extras-block">
+        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <div id="manual-extras-list" class="extras-list"></div>
+        <div class="extras-add-row">
+          <input type="text" id="manual-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="number" id="manual-extra-value" placeholder="수치" step="any">
+          <select id="manual-extra-unit">
+            <option value="">단위없음</option>
+            <option value="mg">mg</option>
+            <option value="g">g</option>
+            <option value="mcg">mcg</option>
+            <option value="ml">ml</option>
+          </select>
+          <button type="button" id="manual-extra-add-btn" class="btn-text">+ 추가</button>
+        </div>
+      </div>
+
       <label class="checkbox-row"><input type="checkbox" id="manual-favorite"> 즐겨찾기에 저장</label>
       <button id="manual-add-btn" class="btn-primary">기록에 추가</button>
     </div>
@@ -291,6 +326,23 @@
           <input type="number" id="edit-protein" placeholder="단백질 (g)" step="any">
           <input type="number" id="edit-carb" placeholder="탄수화물 (g)" step="any">
           <input type="number" id="edit-fat" placeholder="지방 (g)" step="any">
+        </div>
+      </div>
+
+      <div class="extras-block">
+        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <div id="edit-extras-list" class="extras-list"></div>
+        <div class="extras-add-row">
+          <input type="text" id="edit-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="number" id="edit-extra-value" placeholder="수치" step="any">
+          <select id="edit-extra-unit">
+            <option value="">단위없음</option>
+            <option value="mg">mg</option>
+            <option value="g">g</option>
+            <option value="mcg">mcg</option>
+            <option value="ml">ml</option>
+          </select>
+          <button type="button" id="edit-extra-add-btn" class="btn-text">+ 추가</button>
         </div>
       </div>
 
