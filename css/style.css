@@ -968,6 +968,42 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .cal-dot.done { background: var(--accent); }
 .cal-dot.over { background: var(--warn); }
+.cal-hint { text-align: center; font-size: 11px; color: var(--text-soft); margin: 10px 0 0; }
+/* 길게 누를 때 아이폰 확대경/복사 메뉴가 뜨지 않게 */
+.cal-cell {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* 달력 수동 기록 선택창 */
+.manual-day-backdrop { position: fixed; inset: 0; z-index: 40; }
+.manual-day-popup {
+  position: fixed;
+  z-index: 50;
+  width: 184px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(31, 36, 33, 0.12);
+  padding: 10px;
+}
+.manual-day-label { margin: 0 0 8px; font-size: 12px; color: var(--text-soft); text-align: center; }
+.manual-day-actions { display: flex; gap: 8px; }
+.manual-day-btn {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.manual-day-btn.success { background: var(--accent); color: #fff; }
+.manual-day-btn.fail { background: var(--warn-soft); color: var(--warn); }
+.manual-day-btn:active { opacity: 0.8; }
 
 /* ---------- My page ---------- */
 .mypage-email { font-size: 13px; color: var(--text-soft); margin: -8px 0 20px; }

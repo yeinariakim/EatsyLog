@@ -90,6 +90,10 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
 7. **달력** 탭은 한 달 기록을 구독해서 날짜별 칼로리 달성 정도를 작은 도넛링으로 보여줘요.
    달력의 "달성"은 칼로리가 목표 **이하**인 날이에요 (`isCalendarGoalMet()`). 홈 요약의 `isCalorieOnTarget()`(90~110%)과는 달라요.
    연속 달성 바(스트릭)도 이 기준으로 계산해요. 날짜를 누르면 홈으로 이동해요.
+   **수동 기록**: 식단 기록이 하나도 없는 날을 길게 누르면(`attachLongPress()`) 작은 선택창이 떠서 "성공/실패"를 직접 표시해요
+   (`manualDayStatus`). 이미 수동 표시한 날을 다시 길게 누르면 바로 지워져요. 식단 기록이 있는 날은 길게 눌러도 아무 일 없어요.
+   표시 우선순위는 식단 기록(자동 계산) → 수동 기록 → 미기록 순이고, 수동 성공도 스트릭·달성 일수에 들어가요.
+   음식을 추가하면(`addEntry()`) 그 날짜의 수동 기록을 지워서 그때부터는 자동 계산으로 바뀌어요.
 8. **체중** 탭 아래쪽의 **인바디** 섹션은 집 체중계 기록과 따로 체중·골격근량·체지방량을 적어요.
    날짜는 폼에서 직접 고르고(기본값은 위쪽 날짜), 지난 기록을 누르면 폼에서 고칠 수 있어요.
    그래프는 세 지표를 한 차트에 색을 나눠 그려요.
@@ -139,6 +143,9 @@ users/{uid}/workouts/{자동ID}         운동 한 번 기록
 users/{uid}/workoutFavorites/{자동ID}  운동 즐겨찾기 (칼로리·심박수는 저장 안 함)
   { kind: "block", blockType: "cardio" | "other", name, course, durationSec, distanceKm, reps, sets, memo, updatedAt }
   { kind: "exercise", name, sets: [{ kg, reps, sets }], updatedAt }   (근력운동은 종목 하나 단위)
+
+users/{uid}/manualDayStatus/{date}   달력 수동 기록 (문서 ID = 날짜, 식단 기록 없는 날에만)
+  date, status("success" | "fail"), updatedAt
 
 users/{uid}/fcmTokens/{token}
   token, updatedAt
