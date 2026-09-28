@@ -2146,17 +2146,17 @@ const dateMs = (date) => new Date(`${date}T00:00:00`).getTime();
 
 // 한 달 전 대비 변화량: 가장 최근 기록 날짜에서 30일 전에 가장 가까운 기록과 비교해요.
 // 딱 30일 전 기록이 없어도 그 근처에서 제일 가까운 걸 쓰지만, 최근 기록과 15일도 안 떨어진 기록은
-// "한 달 전"이라고 보기 어려워서 빼요 → 그런 기록밖에 없으면(시작한 지 얼마 안 됨) null
+// "한 달 전"이라고 보기 어려워서 빼요. 그런 기록밖에 없으면(새로 시작한 운동) 처음 기록과 비교해요 (fromStart)
 function monthAgoChange(data) {
-  if (data.length < 2) return null;
+  if (data.length < 2) return null; // 한 번만 했으면 비교할 게 없어요
   const last = data[data.length - 1];
   const lastMs = dateMs(last.date);
   const target = lastMs - 30 * DAY_MS;
   const candidates = data.slice(0, -1).filter(d => lastMs - dateMs(d.date) >= 15 * DAY_MS);
-  if (candidates.length === 0) return null;
-  const base = candidates.reduce((best, d) =>
+  const fromStart = candidates.length === 0;
+  const base = fromStart ? data[0] : candidates.reduce((best, d) =>
     Math.abs(dateMs(d.date) - target) < Math.abs(dateMs(best.date) - target) ? d : best);
-  return { diff: Math.round((last.kg - base.kg) * 10) / 10, baseDate: base.date };
+  return { diff: Math.round((last.kg - base.kg) * 10) / 10, baseDate: base.date, fromStart };
 }
 
 // "+5kg"(늘었으면 세이지그린) / "-2.5kg"·"±0kg"(회색). 줄어도 경고색은 안 써요
@@ -2265,9 +2265,10 @@ function renderProgressChart() {
     const first = data[0].kg, last = data[data.length - 1].kg;
     const diff = Math.round((last - first) * 10) / 10;
     const change = monthAgoChange(data);
-    summaryEl.textContent = `처음 ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
+    // 새로 시작한 운동(fromStart)은 목록의 변화량이 곧 "처음 대비"라서, 첫 줄에 시작 날짜만 붙여요
+    summaryEl.textContent = `${change.fromStart ? `시작(${data[0].date.slice(5)})` : "처음"} ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
       + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "")
-      + (change ? `\n한 달 전(${change.baseDate.slice(5)}) 대비 ${formatKgChange(change.diff).text}` : "");
+      + (change.fromStart ? "" : `\n한 달 전(${change.baseDate.slice(5)}) 대비 ${formatKgChange(change.diff).text}`);
   }
 }
 
