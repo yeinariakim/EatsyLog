@@ -78,6 +78,10 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
    모달 입력값은 `blockDraft`에 문자열로 들고 있다가 저장할 때 숫자로 바꿔요.
    종목 이름 추천은 `<datalist>` 대신 직접 만든 목록(`showExerciseSuggest()`)을 써요 (아이폰에서 datalist가 들쭉날쭉해서).
    목록에서는 기록마다 유산소(종류별)·근력·기타·총합을 한 줄씩, 오른쪽에 시간·칼로리를 보여줘요.
+   **운동 즐겨찾기**(`workoutFavs`): 유산소·기타 블록은 "즐겨찾기에 저장"을 체크하고 기록을 저장하면 블록 설정값이 저장되고,
+   "+ 운동 블록 추가" 아래 목록에서 눌러 불러와요. 근력운동은 종목마다 "☆ 즐겨찾기" 버튼으로 종목 이름+무게/횟수/세트를 저장하고,
+   근력 블록 안 목록에서 눌러 종목을 추가해요. **칼로리·심박수는 애플워치 실측값이라 저장하지 않아요** (불러오면 비어 있음).
+   같은 이름(유산소는 이름+코스명)으로 다시 저장하면 새로 만들지 않고 덮어써요.
    아래 "무게 추이"에서 종목을 고르면 날짜별 최고 무게를 차트로 보여줘요.
    (운동 기록은 전체를 한 번에 구독해서 `allWorkouts`에 두고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요)
 7. **달력** 탭은 한 달 기록을 구독해서 날짜별 칼로리 달성 정도를 작은 도넛링으로 보여줘요.
@@ -119,7 +123,7 @@ users/{uid}/favorites/{자동ID}
 users/{uid}/workouts/{자동ID}         운동 한 번 기록
   date, place,
   blocks: [ 적은 순서대로
-    { type: "cardio",   name, durationSec, course, distanceKm, calorie, avgHr }
+    { type: "cardio",   name, durationSec, course(화면 라벨 "코스명"), distanceKm, calorie, avgHr }
     { type: "strength", durationSec, exercises: [{ name, sets: [{ kg, reps, sets }] }], calorie, avgHr }
     { type: "other",    name, durationSec, reps, sets, calorie, memo }   (웜업·쿨다운·맨몸운동 등)
   ],
@@ -128,6 +132,10 @@ users/{uid}/workouts/{자동ID}         운동 한 번 기록
   (선택 칸을 비우면 null로 저장해요. 시간은 모두 "초" 단위)
   (예전 형식 cardio/strength/totalMinutes 문서는 workoutBlocksOf()·workoutTotalSec()가 읽을 때 바꿔 줘요.
    수정해서 저장하면 새 형식으로 덮어써요)
+
+users/{uid}/workoutFavorites/{자동ID}  운동 즐겨찾기 (칼로리·심박수는 저장 안 함)
+  { kind: "block", blockType: "cardio" | "other", name, course, durationSec, distanceKm, reps, sets, memo, updatedAt }
+  { kind: "exercise", name, sets: [{ kg, reps, sets }], updatedAt }   (근력운동은 종목 하나 단위)
 
 users/{uid}/fcmTokens/{token}
   token, updatedAt
