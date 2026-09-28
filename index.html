@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928b">
+<link rel="stylesheet" href="css/style.css?v=20260928c">
 </head>
 <body>
 
@@ -52,13 +52,12 @@
 <!-- 메인 앱 -->
 <div id="app" class="screen" style="display:none">
 
-  <header class="topbar">
+  <header id="topbar" class="topbar">
     <div class="topbar-date">
       <button id="date-prev" class="date-nav">‹</button>
       <span id="current-date-label">오늘</span>
       <button id="date-next" class="date-nav">›</button>
     </div>
-    <button id="settings-btn" class="icon-btn" aria-label="목표 설정">설정</button>
   </header>
 
   <main id="view-home" class="view">
@@ -181,15 +180,63 @@
     </div>
   </main>
 
+  <main id="view-calendar" class="view" style="display:none">
+    <h2 class="view-title">달력</h2>
+    <div class="cal-nav">
+      <button id="cal-prev" class="date-nav" aria-label="이전 달">◀</button>
+      <span id="cal-month-label" class="cal-month-label"></span>
+      <button id="cal-next" class="date-nav" aria-label="다음 달">▶</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+    </div>
+    <div id="cal-grid" class="cal-grid"></div>
+    <p id="cal-summary" class="cal-summary"></p>
+    <div class="cal-legend">
+      <span><i class="cal-dot done"></i>목표 달성 (90~110%)</span>
+      <span><i class="cal-dot partial"></i>진행</span>
+      <span><i class="cal-dot over"></i>초과</span>
+    </div>
+  </main>
+
+  <main id="view-mypage" class="view" style="display:none">
+    <h2 class="view-title">마이페이지</h2>
+    <p id="mypage-email" class="mypage-email"></p>
+
+    <section class="mypage-section">
+      <p class="mypage-section-title">목표 설정</p>
+      <form id="settings-form" class="settings-form">
+        <label>칼로리 (kcal)<input type="number" id="goal-calorie" required></label>
+        <label>단백질 (g)<input type="number" id="goal-protein" required></label>
+        <label>탄수화물 상한 (g)<input type="number" id="goal-carb" required></label>
+        <label>지방 (g)<input type="number" id="goal-fat" required></label>
+        <button type="submit" id="settings-save-btn" class="btn-primary">저장</button>
+      </form>
+    </section>
+
+    <section class="mypage-section">
+      <p class="mypage-section-title">알림</p>
+      <button id="enable-notifications-btn" class="btn-secondary" style="width:100%">알림 켜기</button>
+    </section>
+
+    <button id="logout-btn" class="btn-text">로그아웃</button>
+  </main>
+
   <nav class="tabbar">
+    <button class="tab-btn" data-view="trend">
+      <span class="tab-icon">⟿</span><span class="tab-label">추이</span>
+    </button>
+    <button class="tab-btn" data-view="calendar">
+      <span class="tab-icon">▦</span><span class="tab-label">달력</span>
+    </button>
     <button class="tab-btn active" data-view="home">
       <span class="tab-icon">◎</span><span class="tab-label">홈</span>
     </button>
     <button class="tab-btn" data-view="weight">
       <span class="tab-icon">▨</span><span class="tab-label">체중</span>
     </button>
-    <button class="tab-btn" data-view="trend">
-      <span class="tab-icon">⟿</span><span class="tab-label">추이</span>
+    <button class="tab-btn" data-view="mypage">
+      <span class="tab-icon">◉</span><span class="tab-label">마이페이지</span>
     </button>
   </nav>
 </div>
@@ -352,30 +399,11 @@
   </div>
 </div>
 
-<!-- 설정 모달 -->
-<div id="settings-modal" class="modal-overlay" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>목표 설정</h3>
-      <button id="settings-close" class="icon-btn">닫기</button>
-    </div>
-    <form id="settings-form" class="settings-form">
-      <label>칼로리 (kcal)<input type="number" id="goal-calorie" required></label>
-      <label>단백질 (g)<input type="number" id="goal-protein" required></label>
-      <label>탄수화물 상한 (g)<input type="number" id="goal-carb" required></label>
-      <label>지방 (g)<input type="number" id="goal-fat" required></label>
-      <button type="submit" class="btn-primary">저장</button>
-    </form>
-    <button id="enable-notifications-btn" class="btn-secondary" style="margin-bottom:12px;width:100%">알림 켜기</button>
-    <button id="logout-btn" class="btn-text">로그아웃</button>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928b"></script>
+<script type="module" src="js/app.js?v=20260928c"></script>
 </body>
 </html>
