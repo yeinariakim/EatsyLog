@@ -686,7 +686,8 @@ document.getElementById("manual-add-btn").addEventListener("click", async () => 
         carb: carb / safeAmount,
         fat: fat / safeAmount
       },
-      defaultAmount: safeAmount
+      defaultAmount: safeAmount,
+      extras: manualExtrasCtl.get()
     });
   }
   closeModal("food-modal");
