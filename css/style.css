@@ -152,6 +152,7 @@ input:focus { border-color: var(--accent); }
 
 /* ---------- Topbar ---------- */
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -172,6 +173,72 @@ input:focus { border-color: var(--accent); }
   cursor: pointer;
   padding: 0 4px;
 }
+.date-label-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.date-label-btn:active, .date-label-btn[aria-expanded="true"] { background: var(--surface); }
+.date-label-caret { font-size: 10px; color: var(--text-soft); }
+
+/* 날짜 선택 창 */
+.date-picker-backdrop { position: fixed; inset: 0; z-index: 40; }
+.date-picker {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  z-index: 50;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(31, 36, 33, 0.12);
+  padding: 12px;
+}
+.dp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.dp-nav .date-nav { font-size: 12px; padding: 6px 8px; }
+.dp-nav .date-nav:disabled { opacity: 0.25; cursor: default; }
+.dp-month-label { font-size: 14px; font-weight: 600; }
+.dp-weekdays, .dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center;
+}
+.dp-weekdays { font-size: 11px; color: var(--text-soft); margin-bottom: 4px; }
+.dp-grid { row-gap: 2px; }
+.dp-day {
+  justify-self: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.dp-day.today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.dp-day.selected { background: var(--accent); color: #fff; font-weight: 700; }
+.dp-day:disabled { color: var(--line); cursor: default; }
+.dp-day:not(:disabled):not(.selected):active { background: var(--accent-soft); }
+.dp-today { display: block; margin: 6px auto 0; padding: 4px 0; font-size: 13px; color: var(--accent); }
+
 .icon-btn {
   background: none;
   border: 1px solid var(--line);
@@ -627,7 +694,6 @@ input:focus { border-color: var(--accent); }
 .cal-legend span { display: flex; align-items: center; gap: 4px; }
 .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .cal-dot.done { background: var(--accent); }
-.cal-dot.partial { background: var(--accent-mid); }
 .cal-dot.over { background: var(--warn); }
 
 /* ---------- My page ---------- */

@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928d">
+<link rel="stylesheet" href="css/style.css?v=20260928e">
 </head>
 <body>
 
@@ -55,8 +55,23 @@
   <header id="topbar" class="topbar">
     <div class="topbar-date">
       <button id="date-prev" class="date-nav">‹</button>
-      <span id="current-date-label">오늘</span>
+      <button type="button" id="date-label-btn" class="date-label-btn" aria-haspopup="dialog" aria-expanded="false"
+        aria-label="날짜 선택"><span id="current-date-label">오늘</span><span class="date-label-caret">▾</span></button>
       <button id="date-next" class="date-nav">›</button>
+    </div>
+    <!-- 날짜 선택 창 (날짜 라벨을 누르면 열림) -->
+    <div id="date-picker-backdrop" class="date-picker-backdrop" style="display:none"></div>
+    <div id="date-picker" class="date-picker" role="dialog" aria-label="날짜 선택" style="display:none">
+      <div class="dp-nav">
+        <button type="button" id="dp-prev" class="date-nav" aria-label="이전 달">◀</button>
+        <span id="dp-month-label" class="dp-month-label"></span>
+        <button type="button" id="dp-next" class="date-nav" aria-label="다음 달">▶</button>
+      </div>
+      <div class="dp-weekdays">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div id="dp-grid" class="dp-grid"></div>
+      <button type="button" id="dp-today" class="btn-text dp-today">오늘로</button>
     </div>
   </header>
 
@@ -200,9 +215,8 @@
     <div id="cal-grid" class="cal-grid"></div>
     <p id="cal-summary" class="cal-summary"></p>
     <div class="cal-legend">
-      <span><i class="cal-dot done"></i>목표 달성 (90~110%)</span>
-      <span><i class="cal-dot partial"></i>진행</span>
-      <span><i class="cal-dot over"></i>초과</span>
+      <span><i class="cal-dot done"></i>목표 달성 (목표 이하)</span>
+      <span><i class="cal-dot over"></i>목표 초과</span>
     </div>
   </main>
 
@@ -473,6 +487,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928d"></script>
+<script type="module" src="js/app.js?v=20260928e"></script>
 </body>
 </html>

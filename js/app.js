@@ -354,6 +354,69 @@ document.getElementById("date-next").addEventListener("click", () => {
   setCurrentDate(addDays(currentDate, 1));
 });
 
+// ----- 날짜 선택 창: 위쪽 날짜 라벨을 누르면 작은 달력이 떠서 바로 이동 (홈·체중·운동 탭 공통) -----
+let pickerMonth = currentDate.slice(0, 7); // 선택 창에 보이는 달 "YYYY-MM"
+
+function openDatePicker() {
+  pickerMonth = currentDate.slice(0, 7);
+  renderDatePicker();
+  document.getElementById("date-picker").style.display = "block";
+  document.getElementById("date-picker-backdrop").style.display = "block";
+  document.getElementById("date-label-btn").setAttribute("aria-expanded", "true");
+}
+
+function closeDatePicker() {
+  document.getElementById("date-picker").style.display = "none";
+  document.getElementById("date-picker-backdrop").style.display = "none";
+  document.getElementById("date-label-btn").setAttribute("aria-expanded", "false");
+}
+
+function renderDatePicker() {
+  const [y, m] = pickerMonth.split("-").map(Number);
+  const today = todayStr();
+  document.getElementById("dp-month-label").textContent = `${y}년 ${m}월`;
+  // 오늘이 속한 달보다 미래로는 못 감
+  document.getElementById("dp-next").disabled = pickerMonth >= today.slice(0, 7);
+
+  const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0 = 일요일
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(`<span></span>`);
+  for (let day = 1; day <= daysInMonth(pickerMonth); day++) {
+    const date = `${pickerMonth}-${String(day).padStart(2, "0")}`;
+    const classes = ["dp-day"];
+    if (date === currentDate) classes.push("selected");
+    if (date === today) classes.push("today");
+    cells.push(`<button type="button" class="${classes.join(" ")}" data-dp-date="${date}"
+      ${date > today ? "disabled" : ""}>${day}</button>`);
+  }
+  document.getElementById("dp-grid").innerHTML = cells.join("");
+}
+
+document.getElementById("date-label-btn").addEventListener("click", () => {
+  if (document.getElementById("date-picker").style.display === "block") closeDatePicker();
+  else openDatePicker();
+});
+document.getElementById("date-picker-backdrop").addEventListener("click", closeDatePicker);
+document.getElementById("dp-prev").addEventListener("click", () => {
+  pickerMonth = addMonths(pickerMonth, -1);
+  renderDatePicker();
+});
+document.getElementById("dp-next").addEventListener("click", () => {
+  if (pickerMonth >= todayStr().slice(0, 7)) return;
+  pickerMonth = addMonths(pickerMonth, 1);
+  renderDatePicker();
+});
+document.getElementById("dp-today").addEventListener("click", () => {
+  setCurrentDate(todayStr());
+  closeDatePicker();
+});
+document.getElementById("dp-grid").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-dp-date]");
+  if (!btn || btn.disabled) return;
+  setCurrentDate(btn.dataset.dpDate);
+  closeDatePicker();
+});
+
 // ---------- Entries (meals) ----------
 function subscribeToDate(dateStr) {
   if (entriesUnsub) entriesUnsub();
@@ -448,9 +511,14 @@ function renderGauges(entries = []) {
   renderExtrasSummary(entries);
 }
 
-// 칼로리 목표 달성 기준: 목표의 90~110% (홈 요약과 달력이 같이 씀)
+// 홈 요약의 칼로리 목표 달성 기준: 목표의 90~110%
 function isCalorieOnTarget(calorie) {
   return calorie >= goals.calorie * 0.9 && calorie <= goals.calorie * 1.1;
+}
+
+// 달력의 "목표 달성" 기준: 칼로리가 목표 이하면 달성 (탄단지는 안 봄, 적게 먹은 날도 달성)
+function isCalendarGoalMet(calorie) {
+  return calorie <= goals.calorie;
 }
 
 function renderSummary(totals) {
@@ -1520,7 +1588,7 @@ function renderCalendar() {
   const achieved = day => {
     if (day < 1 || day > lastDay) return false;
     const cal = calendarTotals[dateOf(day)];
-    return cal !== undefined && isCalorieOnTarget(cal);
+    return cal !== undefined && isCalendarGoalMet(cal);
   };
 
   const cells = [];
@@ -1554,7 +1622,7 @@ function renderCalendar() {
     let ring = "";
     if (hasRecord) {
       const pct = goals.calorie ? Math.min(cal / goals.calorie, 1) : 0;
-      const state = done ? "done" : (cal > goals.calorie * 1.1 ? "over" : "partial");
+      const state = done ? "done" : "over";
       ring = `
         <svg viewBox="0 0 40 40" class="cal-ring">
           <circle cx="20" cy="20" r="17" class="cal-ring-track"/>
