@@ -105,6 +105,8 @@ input {
   box-sizing: border-box;
 }
 input:focus { border-color: var(--accent); }
+/* 입력칸은 모두 16px 이상 — 아이폰은 16px보다 작은 칸을 누르면 화면을 자동으로 확대해요 */
+select, textarea { font-family: var(--font); font-size: 16px; }
 
 .btn-primary {
   font-family: var(--font);
@@ -545,7 +547,7 @@ input:focus { border-color: var(--accent); }
 .progress-section .weight-chart-wrap { padding: 12px 0 0; margin-bottom: 8px; }
 .progress-select, .workout-form select {
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 16px;
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -559,7 +561,7 @@ input:focus { border-color: var(--accent); }
 .workout-form { display: flex; flex-direction: column; gap: 12px; }
 .workout-form textarea {
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 16px;
   padding: 12px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -608,7 +610,7 @@ input:focus { border-color: var(--accent); }
   font-size: 12px;
   color: var(--text-soft);
 }
-.field-grid input { padding: 10px 12px; font-size: 15px; }
+.field-grid input { padding: 10px 12px; font-size: 16px; }
 .exercise-list { display: flex; flex-direction: column; gap: 10px; }
 .exercise-list:empty { display: none; }
 .exercise-item {
@@ -620,7 +622,7 @@ input:focus { border-color: var(--accent); }
   gap: 6px;
 }
 .exercise-head { display: flex; align-items: center; gap: 6px; }
-.exercise-head input { flex: 1; padding: 10px 12px; font-size: 15px; }
+.exercise-head input { flex: 1; padding: 10px 12px; font-size: 16px; }
 .exercise-head .food-remove {
   background: none;
   border: none;
@@ -636,7 +638,7 @@ input:focus { border-color: var(--accent); }
   gap: 6px;
   align-items: center;
 }
-.set-row input { padding: 8px 10px; font-size: 15px; text-align: center; }
+.set-row input { padding: 8px 10px; font-size: 16px; text-align: center; }
 .set-row-labels span { font-size: 11px; color: var(--text-soft); text-align: center; }
 .extra-remove:disabled { opacity: 0.3; cursor: default; }
 .exercise-item .btn-text { padding: 4px 0; font-size: 13px; color: var(--accent); }
@@ -856,7 +858,7 @@ input:focus { border-color: var(--accent); }
 .serving-row label { font-size: 13px; color: var(--text-soft); }
 .serving-row select, .serving-row input {
   padding: 10px;
-  font-size: 14px;
+  font-size: 16px;
 }
 .serving-row select { flex: 1; min-width: 0; }
 .amount-row {
