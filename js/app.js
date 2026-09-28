@@ -362,9 +362,49 @@ document.getElementById("date-next").addEventListener("click", () => {
 
 // ----- 날짜 선택 창: 위쪽 날짜 라벨을 누르면 작은 달력이 떠서 바로 이동 (홈·체중·운동 탭 공통) -----
 let pickerMonth = currentDate.slice(0, 7); // 선택 창에 보이는 달 "YYYY-MM"
+// 기록한 날은 숫자 아래에 점을 찍어요. 어떤 기록인지는 지금 탭을 따라가요
+//   홈 = 식단 기록한 날, 체중 = 체중·인바디 적은 날, 운동 = 운동한 날
+let pickerEntryDates = new Set(); // 홈 탭용: 선택 창에 보이는 달의 식단 기록 날짜
+let pickerEntriesUnsub = null;
+
+function activeView() {
+  return document.querySelector(".tab-btn.active")?.dataset.view || "home";
+}
+
+function pickerMarkedDates() {
+  const view = activeView();
+  if (view === "workout") return new Set(allWorkouts.map(w => w.date));
+  if (view === "weight") return new Set([...allWeights, ...allInbody].map(x => x.date));
+  return pickerEntryDates;
+}
+
+// 식단 기록은 평소에 선택한 하루만 구독하고 있어서, 선택 창이 열려 있는 동안만 그 달 기록을 따로 구독해요
+function subscribePickerEntries() {
+  if (pickerEntriesUnsub) { pickerEntriesUnsub(); pickerEntriesUnsub = null; }
+  pickerEntryDates = new Set();
+  if (activeView() !== "home" || !currentUser) return;
+  const month = pickerMonth;
+  const q = fb.query(
+    fb.collection(fb.db, "users", currentUser.uid, "entries"),
+    fb.where("date", ">=", `${month}-01`),
+    fb.where("date", "<=", `${month}-${String(daysInMonth(month)).padStart(2, "0")}`)
+  );
+  pickerEntriesUnsub = fb.onSnapshot(q, (snap) => {
+    if (pickerMonth !== month) return;
+    const dates = new Set();
+    snap.forEach(d => dates.add(d.data().date));
+    pickerEntryDates = dates;
+    renderDatePicker();
+  });
+}
+
+function refreshDatePickerIfOpen() {
+  if (document.getElementById("date-picker").style.display === "block") renderDatePicker();
+}
 
 function openDatePicker() {
   pickerMonth = currentDate.slice(0, 7);
+  subscribePickerEntries();
   renderDatePicker();
   document.getElementById("date-picker").style.display = "block";
   document.getElementById("date-picker-backdrop").style.display = "block";
@@ -372,6 +412,7 @@ function openDatePicker() {
 }
 
 function closeDatePicker() {
+  if (pickerEntriesUnsub) { pickerEntriesUnsub(); pickerEntriesUnsub = null; }
   document.getElementById("date-picker").style.display = "none";
   document.getElementById("date-picker-backdrop").style.display = "none";
   document.getElementById("date-label-btn").setAttribute("aria-expanded", "false");
@@ -385,8 +426,7 @@ function renderDatePicker() {
   document.getElementById("dp-next").disabled = pickerMonth >= today.slice(0, 7);
 
   const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0 = 일요일
-  // 운동한 날은 숫자 아래에 작은 점을 찍어서 한눈에 보이게 해요
-  const workoutDates = new Set(allWorkouts.map(w => w.date));
+  const markedDates = pickerMarkedDates();
   const cells = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(`<span></span>`);
   for (let day = 1; day <= daysInMonth(pickerMonth); day++) {
@@ -394,7 +434,7 @@ function renderDatePicker() {
     const classes = ["dp-day"];
     if (date === currentDate) classes.push("selected");
     if (date === today) classes.push("today");
-    if (workoutDates.has(date)) classes.push("has-workout");
+    if (markedDates.has(date)) classes.push("has-record");
     cells.push(`<button type="button" class="${classes.join(" ")}" data-dp-date="${date}"
       ${date > today ? "disabled" : ""}>${day}</button>`);
   }
@@ -408,11 +448,13 @@ document.getElementById("date-label-btn").addEventListener("click", () => {
 document.getElementById("date-picker-backdrop").addEventListener("click", closeDatePicker);
 document.getElementById("dp-prev").addEventListener("click", () => {
   pickerMonth = addMonths(pickerMonth, -1);
+  subscribePickerEntries();
   renderDatePicker();
 });
 document.getElementById("dp-next").addEventListener("click", () => {
   if (pickerMonth >= todayStr().slice(0, 7)) return;
   pickerMonth = addMonths(pickerMonth, 1);
+  subscribePickerEntries();
   renderDatePicker();
 });
 document.getElementById("dp-today").addEventListener("click", () => {
@@ -563,6 +605,8 @@ function formatAmount(n) {
 const VIEWS_WITH_DATE_BAR = ["home", "weight", "workout"];
 
 function switchView(view) {
+  // 날짜 선택 창의 점은 탭마다 다른 기록을 보여줘서, 탭을 바꾸면 창을 닫아요
+  if (document.getElementById("date-picker").style.display === "block") closeDatePicker();
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.style.display = "none");
   document.getElementById(`view-${view}`).style.display = "block";
@@ -1108,6 +1152,7 @@ function subscribeToWeights() {
     snap.forEach(d => allWeights.push({ id: d.id, ...d.data() }));
     renderWeightHistory();
     renderWeightChart();
+    refreshDatePickerIfOpen();
   });
 }
 
@@ -1172,6 +1217,7 @@ function subscribeToInbody() {
     snap.forEach(d => allInbody.push({ id: d.id, ...d.data() }));
     renderInbodyHistory();
     if (document.getElementById("view-weight").style.display !== "none") renderInbodyChart();
+    refreshDatePickerIfOpen();
   });
 }
 
@@ -1334,7 +1380,7 @@ function subscribeToWorkouts() {
     snap.forEach(d => allWorkouts.push({ id: d.id, ...d.data() }));
     renderWorkoutList();
     renderProgressOptions();
-    if (document.getElementById("date-picker").style.display === "block") renderDatePicker();
+    refreshDatePickerIfOpen();
     if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
   });
 }

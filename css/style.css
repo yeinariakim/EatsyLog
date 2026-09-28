@@ -236,8 +236,8 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   cursor: pointer;
 }
 .dp-day { position: relative; }
-/* 운동한 날: 숫자 아래 작은 점 */
-.dp-day.has-workout::after {
+/* 기록한 날: 숫자 아래 작은 점 (홈=식단, 체중=체중·인바디, 운동=운동) */
+.dp-day.has-record::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -248,7 +248,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   border-radius: 50%;
   background: var(--accent);
 }
-.dp-day.selected.has-workout::after { background: #fff; }
+.dp-day.selected.has-record::after { background: #fff; }
 .dp-day.today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .dp-day.selected { background: var(--accent); color: #fff; font-weight: 700; }
 .dp-day:disabled { color: var(--line); cursor: default; }
