@@ -615,7 +615,7 @@ function switchView(view) {
   document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";
   if (!currentUser) return;
   if (view === "weight") { renderWeightChart(); renderInbodyChart(); }
-  if (view === "workout") renderProgressChart(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
+  if (view === "workout") renderProgress(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
   if (view === "calendar") {
     calendarMonth = currentDate.slice(0, 7); // 홈에서 보던 날짜의 달부터 보여줌
     subscribeToCalendarMonth();
@@ -1380,9 +1380,8 @@ function subscribeToWorkouts() {
     allWorkouts = [];
     snap.forEach(d => allWorkouts.push({ id: d.id, ...d.data() }));
     renderWorkoutList();
-    renderProgressOptions();
     refreshDatePickerIfOpen();
-    if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
+    renderProgress();
   });
 }
 
@@ -2139,17 +2138,80 @@ function getExerciseNames() {
   return [...names].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
-function renderProgressOptions() {
-  const select = document.getElementById("progress-exercise");
-  const names = getExerciseNames();
-  const prev = select.value;
-  document.getElementById("progress-body").style.display = names.length ? "" : "none";
-  document.getElementById("progress-empty").style.display = names.length ? "none" : "";
-  select.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  if (names.includes(prev)) select.value = prev;
+// 종목마다 한 줄씩 "최근 최고 무게 + 한 달 전 대비 변화량"을 보여주고, 줄을 누르면 그 종목만 큰 그래프로 보여줘요
+let progressSelected = null; // 크게 보고 있는 종목 이름 (null이면 목록)
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dateMs = (date) => new Date(`${date}T00:00:00`).getTime();
+
+// 한 달 전 대비 변화량: 가장 최근 기록 날짜에서 30일 전에 가장 가까운 기록과 비교해요.
+// 딱 30일 전 기록이 없어도 그 근처에서 제일 가까운 걸 쓰지만, 최근 기록과 15일도 안 떨어진 기록은
+// "한 달 전"이라고 보기 어려워서 빼요. 그런 기록밖에 없으면(새로 시작한 운동) 처음 기록과 비교해요 (fromStart)
+function monthAgoChange(data) {
+  if (data.length < 2) return null; // 한 번만 했으면 비교할 게 없어요
+  const last = data[data.length - 1];
+  const lastMs = dateMs(last.date);
+  const target = lastMs - 30 * DAY_MS;
+  const candidates = data.slice(0, -1).filter(d => lastMs - dateMs(d.date) >= 15 * DAY_MS);
+  const fromStart = candidates.length === 0;
+  const base = fromStart ? data[0] : candidates.reduce((best, d) =>
+    Math.abs(dateMs(d.date) - target) < Math.abs(dateMs(best.date) - target) ? d : best);
+  return { diff: Math.round((last.kg - base.kg) * 10) / 10, baseDate: base.date, fromStart };
 }
 
-document.getElementById("progress-exercise").addEventListener("change", renderProgressChart);
+// "+5kg"(늘었으면 세이지그린) / "-2.5kg"·"±0kg"(회색). 줄어도 경고색은 안 써요
+function formatKgChange(diff) {
+  if (diff > 0) return { text: `+${formatAmount(diff)}kg`, cls: "up" };
+  if (diff < 0) return { text: `-${formatAmount(-diff)}kg`, cls: "down" };
+  return { text: "±0kg", cls: "down" };
+}
+
+function renderProgress() {
+  const names = getExerciseNames();
+  if (progressSelected && !names.includes(progressSelected)) progressSelected = null; // 그 종목 기록이 다 지워졌으면 목록으로
+  document.getElementById("progress-empty").style.display = names.length ? "none" : "";
+  document.getElementById("progress-list").style.display = names.length && !progressSelected ? "" : "none";
+  document.getElementById("progress-detail").style.display = progressSelected ? "" : "none";
+  if (progressSelected) {
+    // 숨겨진 캔버스에는 크기가 잘못 잡혀서, 운동 탭이 보일 때만 그려요 (탭을 열면 switchView가 다시 불러요)
+    if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
+    return;
+  }
+  if (progressChart) { progressChart.destroy(); progressChart = null; }
+
+  // 최근에 한 종목이 위로 오게
+  const lastDate = (data) => (data.length ? data[data.length - 1].date : "");
+  const rows = names.map(name => ({ name, data: maxWeightByDate(name) }))
+    .sort((a, b) => lastDate(b.data).localeCompare(lastDate(a.data)) || a.name.localeCompare(b.name, "ko"));
+  document.getElementById("progress-list").innerHTML = rows.map(({ name, data }) => {
+    const last = data[data.length - 1];
+    const change = monthAgoChange(data);
+    const chg = change && formatKgChange(change.diff);
+    return `
+      <li>
+        <button type="button" class="progress-row" data-progress-name="${escapeHtml(name)}">
+          <span class="progress-row-name">${escapeHtml(name)}</span>
+          ${last
+            ? `<span class="progress-row-kg">${formatAmount(last.kg)}<small>kg</small></span>`
+            : `<span class="progress-row-none">무게 없음</span>`}
+          <span class="progress-row-change ${chg ? chg.cls : ""}">${chg ? chg.text : ""}</span>
+          <span class="progress-row-chevron" aria-hidden="true">›</span>
+        </button>
+      </li>`;
+  }).join("");
+}
+
+document.getElementById("progress-list").addEventListener("click", (e) => {
+  const row = e.target.closest("[data-progress-name]");
+  if (!row) return;
+  progressSelected = row.dataset.progressName;
+  renderProgress();
+});
+
+document.getElementById("progress-back").addEventListener("click", () => {
+  progressSelected = null;
+  renderProgress();
+});
 
 function maxWeightByDate(name) {
   const byDate = {};
@@ -2162,12 +2224,14 @@ function maxWeightByDate(name) {
   return Object.keys(byDate).sort().map(date => ({ date, kg: byDate[date] }));
 }
 
+// 큰 그래프: 날짜·kg 눈금이 다 있는 라인 그래프 (체중 탭 그래프와 같은 톤)
 function renderProgressChart() {
   const ctx = document.getElementById("progress-chart");
-  const name = document.getElementById("progress-exercise").value;
+  const name = progressSelected;
   if (!ctx || typeof Chart === "undefined") return;
   if (progressChart) { progressChart.destroy(); progressChart = null; }
   const summaryEl = document.getElementById("progress-summary");
+  document.getElementById("progress-detail-name").textContent = name || "";
   if (!name) { summaryEl.textContent = ""; return; }
 
   const data = maxWeightByDate(name);
@@ -2200,8 +2264,11 @@ function renderProgressChart() {
   } else {
     const first = data[0].kg, last = data[data.length - 1].kg;
     const diff = Math.round((last - first) * 10) / 10;
-    summaryEl.textContent = `처음 ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
-      + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "");
+    const change = monthAgoChange(data);
+    // 새로 시작한 운동(fromStart)은 목록의 변화량이 곧 "처음 대비"라서, 첫 줄에 시작 날짜만 붙여요
+    summaryEl.textContent = `${change.fromStart ? `시작(${data[0].date.slice(5)})` : "처음"} ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
+      + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "")
+      + (change.fromStart ? "" : `\n한 달 전(${change.baseDate.slice(5)}) 대비 ${formatKgChange(change.diff).text}`);
   }
 }
 
