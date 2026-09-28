@@ -56,8 +56,6 @@ scripts/send-reminder.js 알림 보내는 스크립트 (GitHub Actions에서 실
 .github/workflows/reminders.yml  알림 보내는 시간표
 ```
 
-> `js/firebase-messaging-sw.js`는 예전 파일이라 지금은 쓰지 않아요. 알림 관련 수정은 루트의 같은 이름 파일에 해야 해요.
-
 ## 내 컴퓨터에서 실행해 보기
 
 빌드 과정이나 `npm install`이 필요 없어요. 폴더에서 로컬 서버만 띄우면 돼요.
