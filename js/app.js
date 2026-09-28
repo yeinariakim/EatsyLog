@@ -421,14 +421,20 @@ function fillGoalForm(g) {
   document.getElementById("goal-fat").value = g.fat;
 }
 
-// 기본 상태: 오늘부터 적용할 새 목표 (칸에는 지금 목표를 채워 둠)
+// 날짜 칸 보이기/숨기기 — 숨기면 "다른 날짜부터 적용" 버튼을 대신 보여줘요 (withToggle=false면 버튼도 숨김)
+function showGoalStartField(show, withToggle = true) {
+  document.getElementById("goal-start-label").style.display = show ? "" : "none";
+  document.getElementById("goal-start-toggle").style.display = !show && withToggle ? "" : "none";
+}
+
+// 기본 상태: 오늘부터 적용할 새 목표 (칸에는 지금 목표를 채워 둠). 날짜 칸은 숨겨 둬요
 function resetGoalForm() {
   editingGoalStart = null;
   const startEl = document.getElementById("goal-start");
   startEl.value = todayStr();
   startEl.max = todayStr();
   startEl.required = true;
-  document.getElementById("goal-start-label").style.display = "";
+  showGoalStartField(false);
   fillGoalForm(goalsFor(todayStr()));
   document.getElementById("settings-save-btn").textContent = "저장";
   document.getElementById("goal-cancel").style.display = "none";
@@ -442,7 +448,7 @@ function startEditGoal(g) {
   const startEl = document.getElementById("goal-start");
   startEl.value = isFirst ? "" : g.startDate;
   startEl.required = !isFirst;
-  document.getElementById("goal-start-label").style.display = isFirst ? "none" : "";
+  showGoalStartField(!isFirst, false);
   fillGoalForm(g);
   document.getElementById("settings-save-btn").textContent = "수정";
   document.getElementById("goal-cancel").style.display = "";
@@ -451,6 +457,11 @@ function startEditGoal(g) {
 }
 
 document.getElementById("goal-cancel").addEventListener("click", resetGoalForm);
+document.getElementById("goal-start-toggle").addEventListener("click", () => {
+  showGoalStartField(true);
+  document.getElementById("goal-cancel").style.display = ""; // 취소하면 다시 오늘부터로 돌아가요
+  document.getElementById("goal-start").focus();
+});
 
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();

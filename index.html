@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260930f">
+<link rel="stylesheet" href="css/style.css?v=20260930g">
 </head>
 <body>
 
@@ -254,11 +254,13 @@
     <section class="mypage-section">
       <p class="mypage-section-title">목표 설정</p>
       <form id="settings-form" class="settings-form">
-        <label id="goal-start-label">적용 시작일<input type="date" id="goal-start" required></label>
         <label>칼로리 (kcal)<input type="number" id="goal-calorie" required></label>
         <label>단백질 (g)<input type="number" id="goal-protein" required></label>
         <label>탄수화물 상한 (g)<input type="number" id="goal-carb" required></label>
         <label>지방 (g)<input type="number" id="goal-fat" required></label>
+        <!-- 평소엔 오늘부터 적용이라 날짜 칸은 숨기고, 필요할 때만 버튼을 눌러 꺼내요 -->
+        <button type="button" id="goal-start-toggle" class="btn-text goal-start-toggle">다른 날짜부터 적용</button>
+        <label id="goal-start-label" style="display:none">언제부터 적용할까요?<input type="date" id="goal-start" required></label>
         <div class="inbody-actions">
           <button type="button" id="goal-cancel" class="btn-secondary" style="display:none">취소</button>
           <button type="submit" id="settings-save-btn" class="btn-primary">저장</button>
@@ -511,6 +513,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260930f"></script>
+<script type="module" src="js/app.js?v=20260930g"></script>
 </body>
 </html>
