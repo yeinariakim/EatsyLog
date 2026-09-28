@@ -236,7 +236,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   cursor: pointer;
 }
 .dp-day { position: relative; }
-/* 기록한 날: 숫자 아래 작은 점 (홈=식단, 체중=체중·인바디, 운동=운동) */
+/* 기록한 날: 숫자 아래 작은 점 (홈=식단, 체중=체중, 운동=운동) */
 .dp-day.has-record::after {
   content: "";
   position: absolute;

@@ -363,7 +363,7 @@ document.getElementById("date-next").addEventListener("click", () => {
 // ----- 날짜 선택 창: 위쪽 날짜 라벨을 누르면 작은 달력이 떠서 바로 이동 (홈·체중·운동 탭 공통) -----
 let pickerMonth = currentDate.slice(0, 7); // 선택 창에 보이는 달 "YYYY-MM"
 // 기록한 날은 숫자 아래에 점을 찍어요. 어떤 기록인지는 지금 탭을 따라가요
-//   홈 = 식단 기록한 날, 체중 = 체중·인바디 적은 날, 운동 = 운동한 날
+//   홈 = 식단 기록한 날, 체중 = 체중 적은 날 (인바디 제외), 운동 = 운동한 날
 let pickerEntryDates = new Set(); // 홈 탭용: 선택 창에 보이는 달의 식단 기록 날짜
 let pickerEntriesUnsub = null;
 
@@ -374,7 +374,7 @@ function activeView() {
 function pickerMarkedDates() {
   const view = activeView();
   if (view === "workout") return new Set(allWorkouts.map(w => w.date));
-  if (view === "weight") return new Set([...allWeights, ...allInbody].map(x => x.date));
+  if (view === "weight") return new Set(allWeights.map(x => x.date)); // 인바디는 빼고 집 체중계 기록만
   return pickerEntryDates;
 }
 
@@ -1217,7 +1217,6 @@ function subscribeToInbody() {
     snap.forEach(d => allInbody.push({ id: d.id, ...d.data() }));
     renderInbodyHistory();
     if (document.getElementById("view-weight").style.display !== "none") renderInbodyChart();
-    refreshDatePickerIfOpen();
   });
 }
 
