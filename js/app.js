@@ -587,32 +587,17 @@ function renderGauges(entries = []) {
   renderExtrasSummary(entries);
 }
 
-// 홈 요약의 칼로리 목표 달성 기준: 목표의 90~110%
-function isCalorieOnTarget(calorie) {
-  return calorie >= goals.calorie * 0.9 && calorie <= goals.calorie * 1.1;
-}
-
 // 달력의 "목표 달성" 기준: 칼로리가 목표 이하면 달성 (탄단지는 안 봄, 적게 먹은 날도 달성)
 function isCalendarGoalMet(calorie) {
   return calorie <= goals.calorie;
 }
 
+// 홈 요약: 탄수화물이 목표를 넘었을 때만 경고 한 줄 (그 외에는 비워 둠)
 function renderSummary(totals) {
   const summaryEl = document.getElementById("daily-summary");
-  const carbOk = totals.carb <= goals.carb;
-  const proteinOk = totals.protein >= goals.protein * 0.9;
-  const fatOk = totals.fat >= goals.fat * 0.85 && totals.fat <= goals.fat * 1.15;
-  const calorieOk = isCalorieOnTarget(totals.calorie);
-
-  if (totals.calorie === 0) {
-    summaryEl.textContent = "기록을 시작해보세요";
-  } else if (carbOk && proteinOk && fatOk && calorieOk) {
-    summaryEl.textContent = "오늘 목표 달성! 🎉";
-  } else if (totals.carb > goals.carb) {
-    summaryEl.textContent = `탄수화물이 목표보다 ${Math.round(totals.carb - goals.carb)}g 많아요`;
-  } else {
-    summaryEl.textContent = "오늘 기록 진행 중이에요";
-  }
+  summaryEl.textContent = totals.carb > goals.carb
+    ? `탄수화물이 목표보다 ${Math.round(totals.carb - goals.carb)}g 많아요`
+    : "";
 }
 
 function escapeHtml(str) {

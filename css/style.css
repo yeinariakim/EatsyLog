@@ -333,6 +333,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   color: var(--accent);
   margin: 10px 20px 4px;
 }
+.daily-summary:empty { display: none; }
 
 .extras-summary {
   display: flex;
