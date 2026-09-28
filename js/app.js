@@ -17,6 +17,9 @@ let referenceServingGrams = null; // this food's own "1회 섭취참고량", if 
 let favoritePerUnitBasis = null; // perUnit(1단위당) 즐겨찾기를 불러왔을 때, 수동입력 "양"을 바꾸면 다시 스케일링하기 위한 기준값
 let favoriteExtrasBasis = null;       // 즐겨찾기의 추가 항목(카페인 등) 원본값 — 양이 바뀌면 이 기준으로 다시 스케일링
 let favoriteExtrasBasisAmount = null; // 위 extras가 원래 몇 그램/몇 개 기준이었는지
+let calendarUnsub = null;
+let calendarMonth = currentDate.slice(0, 7); // 달력에 보이는 달 "YYYY-MM"
+let calendarTotals = {};                      // 그 달의 { "YYYY-MM-DD": 칼로리 합계 } (기록 있는 날만)
 let weightChart, trendChart;
 let trendMode = "calorie";
 
@@ -233,17 +236,20 @@ function initAuth() {
       document.getElementById("auth-screen").style.display = "none";
       document.getElementById("signup-screen").style.display = "none";
       document.getElementById("app").style.display = "block";
+      document.getElementById("mypage-email").textContent = user.email || "";
       await loadGoals();
       subscribeToDate(currentDate);
       subscribeToWeights();
       // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
-      // 설정 화면의 "알림 켜기" 버튼으로 옮김 (아래 참고)
+      // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
     } else {
       currentUser = null;
       document.getElementById("app").style.display = "none";
       document.getElementById("auth-screen").style.display = "block";
       if (entriesUnsub) entriesUnsub();
       if (weightsUnsub) weightsUnsub();
+      if (calendarUnsub) { calendarUnsub(); calendarUnsub = null; }
+      switchView("home"); // 다음에 로그인하면 홈부터 보이도록
     }
   });
 }
@@ -297,10 +303,9 @@ document.getElementById("enable-notifications-btn").addEventListener("click", as
 
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await fb.signOut(fb.auth);
-  closeModal("settings-modal");
 });
 
-// ---------- Goals / Settings ----------
+// ---------- Goals (마이페이지) ----------
 async function loadGoals() {
   const snap = await fb.getDoc(fb.doc(fb.db, "users", currentUser.uid));
   if (snap.exists() && snap.data().goals) {
@@ -315,9 +320,6 @@ async function loadGoals() {
   renderGauges();
 }
 
-document.getElementById("settings-btn").addEventListener("click", () => openModal("settings-modal"));
-document.getElementById("settings-close").addEventListener("click", () => closeModal("settings-modal"));
-
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   goals = {
@@ -328,20 +330,25 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
   };
   await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
   renderGauges();
-  closeModal("settings-modal");
+  renderCalendar(); // 목표가 바뀌면 달력의 달성 여부도 다시 계산
+  const saveBtn = document.getElementById("settings-save-btn");
+  saveBtn.textContent = "저장됨 ✓";
+  setTimeout(() => { saveBtn.textContent = "저장"; }, 1500);
 });
 
 // ---------- Date navigation ----------
-document.getElementById("date-prev").addEventListener("click", () => {
-  currentDate = addDays(currentDate, -1);
+// 홈에서 보는 날짜를 바꿈 (오늘 이후로는 못 감) — 달력에서 날짜를 눌렀을 때도 이걸 써요
+function setCurrentDate(dateStr) {
+  if (dateStr > todayStr()) return;
+  currentDate = dateStr;
   document.getElementById("current-date-label").textContent = formatDateLabel(currentDate);
   subscribeToDate(currentDate);
+}
+document.getElementById("date-prev").addEventListener("click", () => {
+  setCurrentDate(addDays(currentDate, -1));
 });
 document.getElementById("date-next").addEventListener("click", () => {
-  if (currentDate >= todayStr()) return;
-  currentDate = addDays(currentDate, 1);
-  document.getElementById("current-date-label").textContent = formatDateLabel(currentDate);
-  subscribeToDate(currentDate);
+  setCurrentDate(addDays(currentDate, 1));
 });
 
 // ---------- Entries (meals) ----------
@@ -438,12 +445,17 @@ function renderGauges(entries = []) {
   renderExtrasSummary(entries);
 }
 
+// 칼로리 목표 달성 기준: 목표의 90~110% (홈 요약과 달력이 같이 씀)
+function isCalorieOnTarget(calorie) {
+  return calorie >= goals.calorie * 0.9 && calorie <= goals.calorie * 1.1;
+}
+
 function renderSummary(totals) {
   const summaryEl = document.getElementById("daily-summary");
   const carbOk = totals.carb <= goals.carb;
   const proteinOk = totals.protein >= goals.protein * 0.9;
   const fatOk = totals.fat >= goals.fat * 0.85 && totals.fat <= goals.fat * 1.15;
-  const calorieOk = totals.calorie >= goals.calorie * 0.9 && totals.calorie <= goals.calorie * 1.1;
+  const calorieOk = isCalorieOnTarget(totals.calorie);
 
   if (totals.calorie === 0) {
     summaryEl.textContent = "기록을 시작해보세요";
@@ -467,15 +479,25 @@ function formatAmount(n) {
 }
 
 // ---------- Tabs ----------
+// 위쪽 날짜 이동(‹ 오늘 ›)은 날짜별로 보는 탭에서만 보여줘요 (달력·마이페이지는 숨김)
+const VIEWS_WITH_DATE_BAR = ["home", "weight", "trend"];
+
+function switchView(view) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v => v.style.display = "none");
+  document.getElementById(`view-${view}`).style.display = "block";
+  document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";
+  if (!currentUser) return;
+  if (view === "weight") renderWeightChart();
+  if (view === "trend") loadTrendData();
+  if (view === "calendar") {
+    calendarMonth = currentDate.slice(0, 7); // 홈에서 보던 날짜의 달부터 보여줌
+    subscribeToCalendarMonth();
+  }
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".view").forEach(v => v.style.display = "none");
-    document.getElementById(`view-${btn.dataset.view}`).style.display = "block";
-    if (btn.dataset.view === "weight") renderWeightChart();
-    if (btn.dataset.view === "trend") loadTrendData();
-  });
+  btn.addEventListener("click", () => switchView(btn.dataset.view));
 });
 
 // ---------- Food modal ----------
@@ -1135,6 +1157,128 @@ function renderTrendChart() {
       }
     });
   }
+}
+
+// ---------- Calendar ----------
+const CAL_RING_CIRCUMFERENCE = 2 * Math.PI * 17; // 달력 칸 도넛링 (r=17)
+
+function addMonths(ym, delta) {
+  const [y, m] = ym.split("-").map(Number);
+  return todayStr(new Date(y, m - 1 + delta, 1)).slice(0, 7);
+}
+
+function daysInMonth(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+function subscribeToCalendarMonth() {
+  if (calendarUnsub) calendarUnsub();
+  calendarTotals = {};
+  renderCalendar();
+  const month = calendarMonth;
+  const q = fb.query(
+    fb.collection(fb.db, "users", currentUser.uid, "entries"),
+    fb.where("date", ">=", `${month}-01`),
+    fb.where("date", "<=", `${month}-${String(daysInMonth(month)).padStart(2, "0")}`)
+  );
+  calendarUnsub = fb.onSnapshot(q, (snap) => {
+    const totals = {};
+    snap.forEach(d => {
+      const e = d.data();
+      totals[e.date] = (totals[e.date] || 0) + (e.calorie || 0);
+    });
+    calendarTotals = totals;
+    renderCalendar();
+  });
+}
+
+document.getElementById("cal-prev").addEventListener("click", () => {
+  calendarMonth = addMonths(calendarMonth, -1);
+  subscribeToCalendarMonth();
+});
+document.getElementById("cal-next").addEventListener("click", () => {
+  // 오늘이 속한 달보다 미래로는 못 감 (홈 날짜 이동과 같은 규칙)
+  if (calendarMonth >= todayStr().slice(0, 7)) return;
+  calendarMonth = addMonths(calendarMonth, 1);
+  subscribeToCalendarMonth();
+});
+
+function renderCalendar() {
+  const grid = document.getElementById("cal-grid");
+  if (!grid) return;
+  const [y, m] = calendarMonth.split("-").map(Number);
+  document.getElementById("cal-month-label").textContent = `${y}년 ${m}월`;
+  document.getElementById("cal-next").disabled = calendarMonth >= todayStr().slice(0, 7);
+
+  const today = todayStr();
+  const lastDay = daysInMonth(calendarMonth);
+  const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0 = 일요일
+  const dateOf = day => `${calendarMonth}-${String(day).padStart(2, "0")}`;
+  const achieved = day => {
+    if (day < 1 || day > lastDay) return false;
+    const cal = calendarTotals[dateOf(day)];
+    return cal !== undefined && isCalorieOnTarget(cal);
+  };
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(`<div class="cal-cell cal-blank"></div>`);
+
+  let achievedCount = 0;
+  for (let day = 1; day <= lastDay; day++) {
+    const date = dateOf(day);
+    const col = (firstWeekday + day - 1) % 7;
+    const cal = calendarTotals[date];
+    const hasRecord = cal !== undefined;
+    const done = achieved(day);
+    if (done) achievedCount++;
+
+    const classes = ["cal-cell"];
+    if (date === today) classes.push("today");
+    if (date > today) classes.push("future");
+    if (done) classes.push("done");
+    // 연속 달성(스트릭): 이틀 이상 이어지면 뒤에 옅은 바를 깔아서 이어 보이게
+    // 줄의 처음/끝(일·토)에서는 끝을 둥글게 하지 않아서 다음 줄로 이어지는 느낌을 줌
+    const prevDone = achieved(day - 1);
+    const nextDone = achieved(day + 1);
+    if (done && (prevDone || nextDone)) {
+      classes.push("streak");
+      if (!prevDone) classes.push("streak-start");
+      if (!nextDone) classes.push("streak-end");
+      if (col === 0) classes.push("row-start");
+      if (col === 6) classes.push("row-end");
+    }
+
+    let ring = "";
+    if (hasRecord) {
+      const pct = goals.calorie ? Math.min(cal / goals.calorie, 1) : 0;
+      const state = done ? "done" : (cal > goals.calorie * 1.1 ? "over" : "partial");
+      ring = `
+        <svg viewBox="0 0 40 40" class="cal-ring">
+          <circle cx="20" cy="20" r="17" class="cal-ring-track"/>
+          <circle cx="20" cy="20" r="17" class="cal-ring-progress ${state}"
+            stroke-dasharray="${CAL_RING_CIRCUMFERENCE}"
+            stroke-dashoffset="${CAL_RING_CIRCUMFERENCE * (1 - pct)}"/>
+        </svg>`;
+    }
+    const title = hasRecord ? `${m}월 ${day}일 · ${Math.round(cal)}kcal` : `${m}월 ${day}일 · 기록 없음`;
+    cells.push(`
+      <button type="button" class="${classes.join(" ")}" data-cal-date="${date}" title="${title}"
+        ${date > today ? "disabled" : ""}>
+        <span class="cal-day${hasRecord ? "" : " empty"}">${ring}<span class="cal-num">${day}</span></span>
+      </button>`);
+  }
+  grid.innerHTML = cells.join("");
+
+  grid.querySelectorAll("[data-cal-date]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      setCurrentDate(btn.dataset.calDate);
+      switchView("home");
+    });
+  });
+
+  document.getElementById("cal-summary").textContent =
+    achievedCount > 0 ? `${m}월 칼로리 목표 달성 ${achievedCount}일` : "";
 }
 
 // ---------- Modal helpers ----------
