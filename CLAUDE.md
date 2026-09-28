@@ -101,6 +101,7 @@ users/{uid}/fcmTokens/{token}
 - 식약처 API 응답의 영양 필드: `AMT_NUM1`=칼로리, `AMT_NUM3`=단백질, `AMT_NUM4`=지방, `AMT_NUM6`=탄수화물.
 - 같은 종류 음식(`FOOD_REF_NM`)은 평균값 하나로 묶고, 검색어와 딱 맞거나 원재료(`DB_CLASS_CM`="01")인 것을 위로 올려요.
 - 사용자 입력을 HTML에 넣을 때는 `escapeHtml()`을 써요.
+- `js/app.js`나 `css/style.css`를 고치면 `index.html`의 `?v=` 값도 바꿔 주세요. 안 그러면 휴대폰이 예전 파일을 계속 쓸 수 있어요.
 - 모달은 `openModal(id)` / `closeModal(id)`로 열고 닫아요.
 - 숫자 반올림 규칙: 칼로리는 정수, 탄단지는 소수점 한 자리.
 - iOS Safari는 사용자가 직접 누른 버튼에서만 알림 권한을 요청할 수 있어요.
