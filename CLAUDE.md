@@ -45,7 +45,6 @@ js/
   nutrition-api.js       식약처 API 검색, 결과 묶기/정렬, 100g 기준 → 실제 양 환산
   units.js               "1그릇=250g" 같은 단위 프리셋, 음식 이름으로 기본 단위 추측
   notifications.js       알림 권한 받기 + 이 기기의 FCM 토큰을 Firestore에 저장
-  firebase-messaging-sw.js  예전 버전 서비스워커 (등록되지 않음, 사용 안 함)
 scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 식사 알림 전송
 .github/workflows/reminders.yml  매일 08:00 / 11:30 / 19:00 (KST) 실행
 ```
@@ -97,10 +96,10 @@ users/{uid}/fcmTokens/{token}
 
 ## 수정할 때 주의할 점
 
-- **Firebase 설정값은 두 곳에 있어요**: `js/firebase-config.js`와 루트 `firebase-messaging-sw.js`
-  (현재 루트 서비스워커는 설정값 없이 `push` 이벤트를 직접 처리해요). 값을 바꾸면 둘 다 확인하세요.
-- **서비스워커는 저장소 루트의 `firebase-messaging-sw.js`** 가 등록돼요 (`notifications.js`에서 등록).
-  `js/` 안의 같은 이름 파일은 옛날 것이라 고쳐도 반영되지 않아요.
+- **Firebase 설정값은 `js/firebase-config.js` 한 곳에만 있어요.**
+  루트 `firebase-messaging-sw.js`는 설정값 없이 `push` 이벤트를 직접 처리해요.
+- **서비스워커는 저장소 루트의 `firebase-messaging-sw.js`** 예요 (`notifications.js`에서 등록).
+  루트에 있어야 사이트 전체에서 동작하니 `js/` 같은 하위 폴더로 옮기지 마세요.
 - 알림은 `data.body`에 문구를 담아 보내고, 서비스워커가 그 문구 한 줄만 띄워요.
   문구를 바꾸려면 `scripts/send-reminder.js`를, 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준)과
   `send-reminder.js`의 `slots`를 **같이** 고쳐야 해요.
