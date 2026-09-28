@@ -21,7 +21,10 @@ let calendarMonth = currentDate.slice(0, 7); // 달력에 보이는 달 "YYYY-MM
 let calendarTotals = {};                      // 그 달의 { "YYYY-MM-DD": 칼로리 합계 } (기록 있는 날만)
 let workoutsUnsub = null;
 let allWorkouts = [];      // 운동 기록 전체 (날짜별 목록 + 종목별 무게 추이에 같이 씀)
-let weightChart, progressChart;
+let inbodyUnsub = null;
+let allInbody = [];        // 인바디 기록 전체 (날짜순) — 집 체중계 기록(allWeights)과 따로 관리
+let editingInbodyDate = null; // 지난 인바디 기록을 고치는 중이면 그 기록의 날짜
+let weightChart, progressChart, inbodyChart;
 
 // 기록에 붙이는 "양" 단위 — 그램 환산용 UNIT_PRESETS와는 별개로, 그냥 표시용 라벨이에요
 const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
@@ -240,6 +243,7 @@ function initAuth() {
       await loadGoals();
       subscribeToDate(currentDate);
       subscribeToWeights();
+      subscribeToInbody();
       subscribeToWorkouts();
       // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
       // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
@@ -249,6 +253,7 @@ function initAuth() {
       document.getElementById("auth-screen").style.display = "block";
       if (entriesUnsub) entriesUnsub();
       if (weightsUnsub) weightsUnsub();
+      if (inbodyUnsub) { inbodyUnsub(); inbodyUnsub = null; }
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
       if (calendarUnsub) { calendarUnsub(); calendarUnsub = null; }
       switchView("home"); // 다음에 로그인하면 홈부터 보이도록
@@ -346,6 +351,7 @@ function setCurrentDate(dateStr) {
   document.getElementById("current-date-label").textContent = formatDateLabel(currentDate);
   subscribeToDate(currentDate);
   renderWorkoutList();
+  if (!editingInbodyDate) document.getElementById("inbody-date").value = currentDate; // 인바디 날짜 기본값도 같이 따라감
 }
 document.getElementById("date-prev").addEventListener("click", () => {
   setCurrentDate(addDays(currentDate, -1));
@@ -559,7 +565,7 @@ function switchView(view) {
   document.getElementById(`view-${view}`).style.display = "block";
   document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";
   if (!currentUser) return;
-  if (view === "weight") renderWeightChart();
+  if (view === "weight") { renderWeightChart(); renderInbodyChart(); }
   if (view === "workout") renderProgressChart(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
   if (view === "calendar") {
     calendarMonth = currentDate.slice(0, 7); // 홈에서 보던 날짜의 달부터 보여줌
@@ -1143,6 +1149,152 @@ function renderWeightChart() {
       scales: { y: { beginAtZero: false } }
     }
   });
+}
+
+// ---------- InBody (인바디) ----------
+// users/{uid}/inbody/{date}   하루 한 개 (문서 ID = 날짜, 같은 날 다시 기록하면 덮어써요)
+//   date, weightKg, muscleKg, fatKg, updatedAt
+// 주 단위로 재는 값이라 매일 적을 필요 없고, 적은 날끼리만 이어서 그래프로 보여줘요
+const INBODY_METRICS = [
+  { key: "weightKg", label: "체중",     color: "#5B7B6C" },
+  { key: "muscleKg", label: "골격근량", color: "#4E7A9E" },
+  { key: "fatKg",    label: "체지방량", color: "#B8763E" }
+];
+
+function subscribeToInbody() {
+  if (inbodyUnsub) inbodyUnsub();
+  const q = fb.query(fb.collection(fb.db, "users", currentUser.uid, "inbody"), fb.orderBy("date"));
+  inbodyUnsub = fb.onSnapshot(q, (snap) => {
+    allInbody = [];
+    snap.forEach(d => allInbody.push({ id: d.id, ...d.data() }));
+    renderInbodyHistory();
+    if (document.getElementById("view-weight").style.display !== "none") renderInbodyChart();
+  });
+}
+
+function resetInbodyForm() {
+  editingInbodyDate = null;
+  document.getElementById("inbody-form").reset();
+  document.getElementById("inbody-date").value = currentDate;
+  document.getElementById("inbody-date").max = todayStr();
+  document.getElementById("inbody-save-btn").textContent = "기록";
+  document.getElementById("inbody-cancel").style.display = "none";
+  renderInbodyHistory();
+}
+
+function startEditInbody(rec) {
+  editingInbodyDate = rec.date;
+  document.getElementById("inbody-date").value = rec.date;
+  document.getElementById("inbody-weight").value = rec.weightKg ?? "";
+  document.getElementById("inbody-muscle").value = rec.muscleKg ?? "";
+  document.getElementById("inbody-fat").value = rec.fatKg ?? "";
+  document.getElementById("inbody-save-btn").textContent = "수정";
+  document.getElementById("inbody-cancel").style.display = "";
+  renderInbodyHistory();
+  document.getElementById("inbody-form").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+document.getElementById("inbody-date").value = currentDate;
+document.getElementById("inbody-date").max = todayStr();
+document.getElementById("inbody-cancel").addEventListener("click", resetInbodyForm);
+
+document.getElementById("inbody-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const date = document.getElementById("inbody-date").value;
+  const weightKg = Number(document.getElementById("inbody-weight").value);
+  const muscleKg = Number(document.getElementById("inbody-muscle").value);
+  const fatKg = Number(document.getElementById("inbody-fat").value);
+  if (!date || !weightKg || !muscleKg || !fatKg) return;
+  if (date > todayStr()) { alert("오늘 이후 날짜에는 기록할 수 없어요"); return; }
+  const exists = allInbody.some(r => r.date === date);
+  // 새로 적는데 그 날짜에 이미 기록이 있거나, 고치다가 다른 기록이 있는 날짜로 옮기면 덮어쓰기 전에 한 번 물어봐요
+  if (exists && date !== editingInbodyDate && !confirm(`${formatDateLabel(date)} 인바디 기록이 이미 있어요. 덮어쓸까요?`)) return;
+  const ref = (d) => fb.doc(fb.db, "users", currentUser.uid, "inbody", d);
+  await fb.setDoc(ref(date), {
+    date,
+    weightKg: Math.round(weightKg * 10) / 10,
+    muscleKg: Math.round(muscleKg * 10) / 10,
+    fatKg: Math.round(fatKg * 10) / 10,
+    updatedAt: fb.serverTimestamp()
+  });
+  // 고치면서 날짜를 바꿨으면 예전 날짜 문서는 지워요 (문서 ID = 날짜라서)
+  if (editingInbodyDate && editingInbodyDate !== date) await fb.deleteDoc(ref(editingInbodyDate));
+  resetInbodyForm();
+});
+
+function renderInbodyHistory() {
+  const el = document.getElementById("inbody-history");
+  if (!el) return;
+  if (allInbody.length === 0) {
+    el.innerHTML = `<li class="food-list-empty">인바디를 잰 날에만 기록하면 돼요</li>`;
+    return;
+  }
+  const recent = [...allInbody].reverse().slice(0, 30);
+  el.innerHTML = recent.map(r => `
+    <li>
+      <button type="button" class="inbody-edit-trigger${r.date === editingInbodyDate ? " editing" : ""}" data-inbody-edit="${escapeHtml(r.date)}">
+        <span class="w-date">${escapeHtml(formatDateLabel(r.date))}</span>
+        <span class="inbody-values"><i>체중</i>${formatAmount(r.weightKg)} · <i>골격근</i>${formatAmount(r.muscleKg)} · <i>체지방</i>${formatAmount(r.fatKg)}kg</span>
+      </button>
+      <button type="button" class="food-remove" data-inbody-remove="${escapeHtml(r.date)}">삭제</button>
+    </li>
+  `).join("");
+
+  el.querySelectorAll("[data-inbody-edit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rec = allInbody.find(r => r.date === btn.dataset.inbodyEdit);
+      if (rec) startEditInbody(rec);
+    });
+  });
+  el.querySelectorAll("[data-inbody-remove]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const date = btn.dataset.inbodyRemove;
+      if (!confirm(`${formatDateLabel(date)} 인바디 기록을 삭제할까요?`)) return;
+      await fb.deleteDoc(fb.doc(fb.db, "users", currentUser.uid, "inbody", date));
+      if (editingInbodyDate === date) resetInbodyForm();
+    });
+  });
+}
+
+function renderInbodyChart() {
+  const ctx = document.getElementById("inbody-chart");
+  if (!ctx || typeof Chart === "undefined") return;
+  if (inbodyChart) { inbodyChart.destroy(); inbodyChart = null; }
+  // 기록이 2개 이상일 때만 선으로 이어 보여줘요 (기록한 날끼리만 이어요)
+  const data = allInbody.slice(-20);
+  document.getElementById("inbody-chart-body").style.display = data.length >= 2 ? "" : "none";
+  if (data.length < 2) return;
+  inbodyChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.map(r => r.date.slice(5)),
+      datasets: INBODY_METRICS.map(m => ({
+        label: m.label,
+        data: data.map(r => (typeof r[m.key] === "number" ? r[m.key] : null)),
+        borderColor: m.color,
+        backgroundColor: m.color,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+        spanGaps: true
+      }))
+    },
+    options: {
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.parsed.y}kg` } }
+      },
+      scales: { y: { beginAtZero: false, ticks: { callback: (v) => `${v}kg` } } }
+    }
+  });
+
+  // 세 지표가 한 축을 같이 써서 작은 변화는 선으로 잘 안 보이니, 처음 → 최근 변화량을 한 줄로 같이 보여줘요
+  const first = data[0], last = data[data.length - 1];
+  document.getElementById("inbody-summary").textContent = `${first.date.slice(5)} 대비 ` + INBODY_METRICS.map(m => {
+    const diff = Math.round(((last[m.key] ?? 0) - (first[m.key] ?? 0)) * 10) / 10;
+    return `${m.label} ${diff > 0 ? "+" : ""}${formatAmount(diff)}kg`;
+  }).join(" · ");
 }
 
 // ---------- Workouts (운동) ----------
