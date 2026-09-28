@@ -385,6 +385,8 @@ function renderDatePicker() {
   document.getElementById("dp-next").disabled = pickerMonth >= today.slice(0, 7);
 
   const firstWeekday = new Date(y, m - 1, 1).getDay(); // 0 = 일요일
+  // 운동한 날은 숫자 아래에 작은 점을 찍어서 한눈에 보이게 해요
+  const workoutDates = new Set(allWorkouts.map(w => w.date));
   const cells = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(`<span></span>`);
   for (let day = 1; day <= daysInMonth(pickerMonth); day++) {
@@ -392,6 +394,7 @@ function renderDatePicker() {
     const classes = ["dp-day"];
     if (date === currentDate) classes.push("selected");
     if (date === today) classes.push("today");
+    if (workoutDates.has(date)) classes.push("has-workout");
     cells.push(`<button type="button" class="${classes.join(" ")}" data-dp-date="${date}"
       ${date > today ? "disabled" : ""}>${day}</button>`);
   }
@@ -1331,6 +1334,7 @@ function subscribeToWorkouts() {
     snap.forEach(d => allWorkouts.push({ id: d.id, ...d.data() }));
     renderWorkoutList();
     renderProgressOptions();
+    if (document.getElementById("date-picker").style.display === "block") renderDatePicker();
     if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
   });
 }
@@ -1380,24 +1384,33 @@ function formatDuration(sec) {
 
 const sumBlockSec = (blocks) => blocks.reduce((sum, b) => sum + (b.durationSec || 0), 0);
 
-// 목록 한 줄 요약: "🏃 인터벌 러닝 20분 · 🏋️ 근력 21분 · 🧘 웜업/쿨다운 10분 · 총 335kcal"
-// 유산소는 종류마다 따로, 근력·기타는 각각 한 덩어리로 묶어서 보여줘요
-function formatWorkoutSummary(w) {
+// 목록 요약: 유산소는 종류마다 한 줄씩, 근력·기타는 각각 한 줄로 묶고, 마지막에 총합 한 줄
+//   🏃 인터벌 러닝        20분 · 180kcal
+//   🏋️ 근력               21분 · 100kcal
+//   🧘 웜업/쿨다운         9분 30초 · 20kcal
+//   총합                  50분 50초 · 300kcal
+function workoutSummaryRows(w) {
   const blocks = workoutBlocksOf(w);
-  const dur = (sec) => (sec ? ` ${formatDuration(sec)}` : "");
-  const parts = [];
+  const sumCal = (bs) => bs.some(b => typeof b.calorie === "number")
+    ? bs.reduce((sum, b) => sum + (b.calorie || 0), 0) : null;
+  const rows = [];
   blocks.filter(b => b.type === "cardio").forEach(b => {
-    parts.push(`🏃 ${b.name || "유산소"}${dur(b.durationSec)}`);
+    rows.push({ label: `🏃 ${b.name || "유산소"}`, sec: b.durationSec, calorie: b.calorie ?? null });
   });
   const strength = blocks.filter(b => b.type === "strength");
-  if (strength.length) parts.push(`🏋️ 근력${dur(sumBlockSec(strength))}`);
+  if (strength.length) rows.push({ label: "🏋️ 근력", sec: sumBlockSec(strength), calorie: sumCal(strength) });
   const others = blocks.filter(b => b.type === "other");
   if (others.length) {
     const names = [...new Set(others.map(b => (b.name || "").trim()).filter(Boolean))];
-    parts.push(`🧘 ${names.join("/") || "기타"}${dur(sumBlockSec(others))}`);
+    rows.push({ label: `🧘 ${names.join("/") || "기타"}`, sec: sumBlockSec(others), calorie: sumCal(others) });
   }
-  if (w.totalCalorie) parts.push(`총 ${Math.round(w.totalCalorie)}kcal`);
-  return parts.join(" · ");
+  rows.push({ label: "총합", sec: workoutTotalSec(w), calorie: w.totalCalorie ?? null, total: true });
+  return rows;
+}
+
+function formatTimeCalorie(sec, calorie) {
+  return [formatDuration(sec), typeof calorie === "number" ? `${Math.round(calorie)}kcal` : ""]
+    .filter(Boolean).join(" · ") || "-";
 }
 
 function renderWorkoutList() {
@@ -1416,7 +1429,11 @@ function renderWorkoutList() {
     return `
       <li>
         <button class="workout-edit-trigger" data-workout-edit="${w.id}">
-          <span class="workout-summary">${escapeHtml(formatWorkoutSummary(w) || "운동 기록")}</span>
+          ${workoutSummaryRows(w).map(r => `
+            <span class="workout-row${r.total ? " total" : ""}">
+              <span class="workout-row-label">${escapeHtml(r.label)}</span>
+              <span class="workout-row-value">${escapeHtml(formatTimeCalorie(r.sec, r.calorie))}</span>
+            </span>`).join("")}
           ${detail ? `<span class="workout-detail">${escapeHtml(detail)}</span>` : ""}
         </button>
         <button class="food-remove" data-workout-remove="${w.id}">삭제</button>
@@ -1517,7 +1534,7 @@ function renderExercises(d, i) {
       <div class="exercise-item">
         <div class="exercise-head">
           <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
-            ${bind(i, "name")} data-ex="${k}" list="exercise-name-options">
+            ${bind(i, "name")} data-ex="${k}" class="exercise-name-input" autocomplete="off">
           <button type="button" class="food-remove" data-act="remove-ex" data-b="${i}" data-ex="${k}">삭제</button>
         </div>
         <div class="set-row set-row-labels"><span>무게 (kg)</span><span>횟수</span><span>세트</span><span></span></div>
@@ -1568,6 +1585,7 @@ function renderBlockBody(d, i) {
 }
 
 function renderWorkoutBlocks() {
+  hideExerciseSuggest();
   const el = document.getElementById("workout-blocks");
   el.innerHTML = blockDraft.map((d, i) => `
     <div class="workout-block" data-block-index="${i}">
@@ -1582,10 +1600,47 @@ function renderWorkoutBlocks() {
         <button type="button" class="btn-text" data-act="down" data-b="${i}" ${i === blockDraft.length - 1 ? "disabled" : ""}>↓ 아래로</button>
         <button type="button" class="btn-text block-remove" data-act="remove" data-b="${i}">블록 삭제</button>
       </div>
-    </div>`).join("") + `<datalist id="exercise-name-options">${
-    getExerciseNames().map(n => `<option value="${escapeHtml(n)}">`).join("")
-  }</datalist>`;
+    </div>`).join("");
 }
+
+// ----- 종목 이름 추천 -----
+// 브라우저 기본 datalist는 아이폰에서 첫 칸에 안 뜨는 등 들쭉날쭉해서, 입력칸 바로 아래에 직접 목록을 띄워요.
+// 목록은 지금까지 저장한 종목 + 이 모달에서 이미 적은 종목에서 만들어요.
+const exerciseSuggest = document.createElement("ul");
+exerciseSuggest.className = "exercise-suggest";
+let suggestInput = null;
+
+function hideExerciseSuggest() {
+  exerciseSuggest.remove();
+  suggestInput = null;
+}
+
+function showExerciseSuggest(input) {
+  const query = input.value.trim().toLowerCase();
+  const drafted = blockDraft.flatMap(d => d.exercises.map(ex => ex.name.trim()));
+  const names = [...new Set([...getExerciseNames(), ...drafted])]
+    .filter(n => n && n.toLowerCase() !== query && n.toLowerCase().includes(query))
+    .slice(0, 8);
+  if (names.length === 0) { hideExerciseSuggest(); return; }
+  exerciseSuggest.innerHTML = names.map(n =>
+    `<li><button type="button" data-suggest="${escapeHtml(n)}">${escapeHtml(n)}</button></li>`).join("");
+  suggestInput = input;
+  input.closest(".exercise-head").appendChild(exerciseSuggest);
+}
+
+// 누르는 순간 입력칸 포커스가 빠지지 않게 막아요 (빠지면 목록이 먼저 닫혀서 선택이 안 됨)
+exerciseSuggest.addEventListener("pointerdown", (e) => e.preventDefault());
+exerciseSuggest.addEventListener("mousedown", (e) => e.preventDefault());
+exerciseSuggest.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-suggest]");
+  if (!btn || !suggestInput) return;
+  const input = suggestInput;
+  input.value = btn.dataset.suggest;
+  blockDraft[Number(input.dataset.b)].exercises[Number(input.dataset.ex)].name = input.value;
+  hideExerciseSuggest();
+  // 이름을 골랐으면 바로 첫 무게 칸으로
+  input.closest(".exercise-item").querySelector('[data-f="kg"]')?.focus();
+});
 
 // 입력은 상태(blockDraft)에만 반영 — 매번 다시 그리면 휴대폰 키보드가 닫혀서, 추가/삭제할 때만 다시 그림
 function onBlockInput(e) {
@@ -1600,10 +1655,17 @@ function onBlockInput(e) {
   } else {
     d[t.dataset.f] = t.value;
   }
+  if (t.classList.contains("exercise-name-input") && e.type === "input") showExerciseSuggest(t);
   updateWorkoutTotals();
 }
 document.getElementById("workout-blocks").addEventListener("input", onBlockInput);
 document.getElementById("workout-blocks").addEventListener("change", onBlockInput);
+document.getElementById("workout-blocks").addEventListener("focusin", (e) => {
+  if (e.target.classList.contains("exercise-name-input")) showExerciseSuggest(e.target);
+});
+document.getElementById("workout-blocks").addEventListener("focusout", (e) => {
+  if (e.target === suggestInput) hideExerciseSuggest();
+});
 
 document.getElementById("workout-blocks").addEventListener("click", (e) => {
   const t = e.target.closest("[data-act]");

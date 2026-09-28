@@ -235,6 +235,20 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   color: var(--text);
   cursor: pointer;
 }
+.dp-day { position: relative; }
+/* 운동한 날: 숫자 아래 작은 점 */
+.dp-day.has-workout::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.dp-day.selected.has-workout::after { background: #fff; }
 .dp-day.today { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .dp-day.selected { background: var(--accent); color: #fff; font-weight: 700; }
 .dp-day:disabled { color: var(--line); cursor: default; }
@@ -502,7 +516,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .workout-list { list-style: none; margin: 0 0 12px; padding: 0; }
 .workout-list li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
@@ -521,7 +535,22 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   color: inherit;
   cursor: pointer;
 }
-.workout-summary { font-size: 14px; font-weight: 600; }
+.workout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+.workout-row-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workout-row-value { flex-shrink: 0; color: var(--text-soft); font-size: 13px; }
+.workout-row.total {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-weight: 600;
+}
+.workout-row.total .workout-row-value { color: var(--accent); font-weight: 600; }
 .workout-detail {
   font-size: 12px;
   color: var(--text-soft);
@@ -652,7 +681,38 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   flex-direction: column;
   gap: 6px;
 }
-.exercise-head { display: flex; align-items: center; gap: 6px; }
+.exercise-head { display: flex; align-items: center; gap: 6px; position: relative; }
+/* 종목 이름 추천 목록 (입력칸 바로 아래에 떠요) */
+.exercise-suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(31, 36, 33, 0.12);
+}
+.exercise-suggest button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: var(--font);
+  font-size: 15px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.exercise-suggest button:active { background: var(--accent-soft); }
 .exercise-head input { flex: 1; padding: 10px 12px; font-size: 16px; }
 .exercise-head .food-remove {
   background: none;
