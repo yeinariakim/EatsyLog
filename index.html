@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928h">
+<link rel="stylesheet" href="css/style.css?v=20260928i">
 </head>
 <body>
 
@@ -212,7 +212,7 @@
     <button id="add-workout-btn" class="btn-primary workout-add-btn">+ 운동 기록 추가</button>
 
     <section class="progress-section">
-      <p class="mypage-section-title">무게 추이</p>
+      <p class="mypage-section-title">무게 추이 보기</p>
       <div id="progress-body" style="display:none">
         <select id="progress-exercise" class="progress-select" aria-label="근력운동 종목"></select>
         <div class="weight-chart-wrap">
@@ -453,48 +453,30 @@
     <form id="workout-form" class="workout-form">
       <input type="text" id="workout-place" placeholder="장소 / 헬스장 (선택)">
 
-      <div class="pill-toggles">
-        <button type="button" class="pill-toggle" data-block="cardio">🏃 유산소</button>
-        <button type="button" class="pill-toggle" data-block="strength">🏋️ 근력운동</button>
-      </div>
+      <!-- 운동 블록들: app.js의 blockDraft를 그대로 그려요 (유산소 / 근력운동 / 기타) -->
+      <div id="workout-blocks" class="workout-blocks"></div>
 
-      <!-- 유산소 -->
-      <div id="cardio-block" class="workout-block" style="display:none">
-        <p class="workout-block-title">유산소</p>
-        <input type="text" id="cardio-type" placeholder="운동 종류 (예: 인터벌 러닝)">
-        <textarea id="cardio-course" rows="2" placeholder="코스/프로그램 메모 (예: 마이마운틴 미디움 2번 코스)"></textarea>
-        <div class="field-grid">
-          <label>시간 (분)<input type="number" id="cardio-minutes" step="any" inputmode="decimal"></label>
-          <label>거리 (km, 선택)<input type="number" id="cardio-distance" step="any" inputmode="decimal"></label>
-          <label>소모 칼로리 (kcal)<input type="number" id="cardio-calorie" step="any" inputmode="decimal"></label>
-          <label>총 소모 칼로리 (선택)<input type="number" id="cardio-total-calorie" step="any" inputmode="decimal"></label>
-          <label>평균 심박수 (bpm, 선택)<input type="number" id="cardio-hr" step="any" inputmode="decimal"></label>
-        </div>
-      </div>
-
-      <!-- 근력운동 -->
-      <div id="strength-block" class="workout-block" style="display:none">
-        <p class="workout-block-title">근력운동</p>
-        <div class="field-grid">
-          <label>시간 (분)<input type="number" id="strength-minutes" step="any" inputmode="decimal"></label>
-        </div>
-        <div id="exercise-list" class="exercise-list"></div>
-        <button type="button" id="add-exercise-btn" class="btn-secondary">+ 운동 추가</button>
-        <div class="field-grid">
-          <label>소모 칼로리 (kcal)<input type="number" id="strength-calorie" step="any" inputmode="decimal"></label>
-          <label>총 소모 칼로리 (선택)<input type="number" id="strength-total-calorie" step="any" inputmode="decimal"></label>
-          <label>평균 심박수 (bpm, 선택)<input type="number" id="strength-hr" step="any" inputmode="decimal"></label>
-        </div>
+      <button type="button" id="add-block-btn" class="btn-secondary">+ 운동 블록 추가</button>
+      <div id="block-type-picker" class="block-type-picker" style="display:none">
+        <button type="button" class="pill-toggle" data-add-block="cardio">🏃 유산소</button>
+        <button type="button" class="pill-toggle" data-add-block="strength">🏋️ 근력운동</button>
+        <button type="button" class="pill-toggle" data-add-block="other">🧘 기타</button>
       </div>
 
       <!-- 합계: 자동으로 더하지만 직접 고칠 수 있음 -->
-      <div class="workout-block">
+      <div class="workout-block workout-total-block">
+        <p class="workout-block-title">전체 요약</p>
         <div class="field-grid">
-          <label>총 운동시간 (분)<input type="number" id="workout-total-minutes" step="any" inputmode="decimal"></label>
-          <label>총 소모 칼로리 (kcal)<input type="number" id="workout-total-calorie" step="any" inputmode="decimal"></label>
+          <div class="field field-wide">총 운동시간
+            <span class="time-selects">
+              <select id="workout-total-min" aria-label="총 운동시간 분"></select><span>분</span>
+              <select id="workout-total-sec" aria-label="총 운동시간 초"></select><span>초</span>
+            </span>
+          </div>
+          <label class="field-wide">총 소모 칼로리 (kcal)<input type="number" id="workout-total-calorie" step="any" inputmode="decimal"></label>
         </div>
         <p class="workout-total-hint">
-          유산소·근력을 자동으로 더해요 (칼로리는 "총 소모 칼로리"가 있으면 그 값으로). 직접 고치면 그 값으로 저장돼요.
+          모든 블록의 시간·칼로리를 자동으로 더해요. 직접 고치면 그 값으로 저장돼요.
           <button type="button" id="workout-total-reset" class="btn-text" style="display:none">자동 합계로 되돌리기</button>
         </p>
       </div>
@@ -510,6 +492,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928h"></script>
+<script type="module" src="js/app.js?v=20260928i"></script>
 </body>
 </html>
