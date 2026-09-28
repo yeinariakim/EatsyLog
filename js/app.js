@@ -173,12 +173,11 @@ function renderExtrasSummary(entries) {
     el.innerHTML = "";
     return;
   }
-  const labels = abbreviateExtraNames(names);
   const visibleNames = extrasExpanded ? names : names.slice(0, 4);
   const chips = visibleNames.map(n => {
     const t = totals[n];
     const val = formatAmount(Math.round(t.value * 10) / 10);
-    return `<span class="extra-summary-chip" title="${escapeHtml(n)}">${escapeHtml(labels[n])}${val}${t.unit || ""}</span>`;
+    return `<span class="extra-summary-chip" title="${escapeHtml(n)}">${escapeHtml(n)} ${val}${t.unit || ""}</span>`;
   }).join("");
   const hiddenCount = names.length - visibleNames.length;
   const moreBtn = hiddenCount > 0
@@ -377,7 +376,7 @@ function formatEntryMacro(item, extraLabels) {
 }
 
 function renderMeals(entries) {
-  // 위쪽 추가 항목 요약 칩과 같은 줄임말(카·나 등)을 쓰도록 그날 기록 전체 이름으로 만듦
+  // 한 줄에 들어가도록 줄임말(카·나 등)을 씀 — 그날 기록 전체 이름 기준이라 겹치면 두 글자(카페·카카)로
   const extraLabels = abbreviateExtraNames(Object.keys(computeExtraTotals(entries)));
   ["breakfast", "lunch", "dinner", "snack"].forEach(meal => {
     const list = document.querySelector(`[data-meal-list="${meal}"]`);
