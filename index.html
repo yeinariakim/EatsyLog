@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928c">
+<link rel="stylesheet" href="css/style.css?v=20260928d">
 </head>
 <body>
 
@@ -169,15 +169,22 @@
     <ul id="weight-history" class="weight-history"></ul>
   </main>
 
-  <main id="view-trend" class="view" style="display:none">
-    <h2 class="view-title">추이</h2>
-    <div class="trend-tabs">
-      <button class="trend-tab active" data-trend="calorie">칼로리</button>
-      <button class="trend-tab" data-trend="macro">탄단지</button>
-    </div>
-    <div class="trend-chart-wrap">
-      <canvas id="trend-chart"></canvas>
-    </div>
+  <main id="view-workout" class="view" style="display:none">
+    <h2 class="view-title">운동</h2>
+    <ul id="workout-list" class="workout-list"></ul>
+    <button id="add-workout-btn" class="btn-primary workout-add-btn">+ 운동 기록 추가</button>
+
+    <section class="progress-section">
+      <p class="mypage-section-title">무게 추이</p>
+      <div id="progress-body" style="display:none">
+        <select id="progress-exercise" class="progress-select" aria-label="근력운동 종목"></select>
+        <div class="weight-chart-wrap">
+          <canvas id="progress-chart"></canvas>
+        </div>
+        <p id="progress-summary" class="progress-summary"></p>
+      </div>
+      <p id="progress-empty" class="food-list-empty">근력운동 종목을 기록하면 날짜별 최고 무게를 여기서 볼 수 있어요</p>
+    </section>
   </main>
 
   <main id="view-calendar" class="view" style="display:none">
@@ -223,8 +230,8 @@
   </main>
 
   <nav class="tabbar">
-    <button class="tab-btn" data-view="trend">
-      <span class="tab-icon">⟿</span><span class="tab-label">추이</span>
+    <button class="tab-btn" data-view="workout">
+      <span class="tab-icon">◈</span><span class="tab-label">운동</span>
     </button>
     <button class="tab-btn" data-view="calendar">
       <span class="tab-icon">▦</span><span class="tab-label">달력</span>
@@ -399,11 +406,73 @@
   </div>
 </div>
 
+<!-- 운동 기록 모달 -->
+<div id="workout-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="workout-modal-title">운동 기록 추가</h3>
+      <button id="workout-close" class="icon-btn">닫기</button>
+    </div>
+    <form id="workout-form" class="workout-form">
+      <input type="text" id="workout-place" placeholder="장소 / 헬스장 (선택)">
+
+      <div class="pill-toggles">
+        <button type="button" class="pill-toggle" data-block="cardio">🏃 유산소</button>
+        <button type="button" class="pill-toggle" data-block="strength">🏋️ 근력운동</button>
+      </div>
+
+      <!-- 유산소 -->
+      <div id="cardio-block" class="workout-block" style="display:none">
+        <p class="workout-block-title">유산소</p>
+        <input type="text" id="cardio-type" placeholder="운동 종류 (예: 인터벌 러닝)">
+        <textarea id="cardio-course" rows="2" placeholder="코스/프로그램 메모 (예: 마이마운틴 미디움 2번 코스)"></textarea>
+        <div class="field-grid">
+          <label>시간 (분)<input type="number" id="cardio-minutes" step="any" inputmode="decimal"></label>
+          <label>거리 (km, 선택)<input type="number" id="cardio-distance" step="any" inputmode="decimal"></label>
+          <label>소모 칼로리 (kcal)<input type="number" id="cardio-calorie" step="any" inputmode="decimal"></label>
+          <label>총 소모 칼로리 (선택)<input type="number" id="cardio-total-calorie" step="any" inputmode="decimal"></label>
+          <label>평균 심박수 (bpm, 선택)<input type="number" id="cardio-hr" step="any" inputmode="decimal"></label>
+        </div>
+      </div>
+
+      <!-- 근력운동 -->
+      <div id="strength-block" class="workout-block" style="display:none">
+        <p class="workout-block-title">근력운동</p>
+        <div class="field-grid">
+          <label>시간 (분)<input type="number" id="strength-minutes" step="any" inputmode="decimal"></label>
+        </div>
+        <div id="exercise-list" class="exercise-list"></div>
+        <button type="button" id="add-exercise-btn" class="btn-secondary">+ 운동 추가</button>
+        <div class="field-grid">
+          <label>소모 칼로리 (kcal)<input type="number" id="strength-calorie" step="any" inputmode="decimal"></label>
+          <label>총 소모 칼로리 (선택)<input type="number" id="strength-total-calorie" step="any" inputmode="decimal"></label>
+          <label>평균 심박수 (bpm, 선택)<input type="number" id="strength-hr" step="any" inputmode="decimal"></label>
+        </div>
+      </div>
+
+      <!-- 합계: 자동으로 더하지만 직접 고칠 수 있음 -->
+      <div class="workout-block">
+        <div class="field-grid">
+          <label>총 운동시간 (분)<input type="number" id="workout-total-minutes" step="any" inputmode="decimal"></label>
+          <label>총 소모 칼로리 (kcal)<input type="number" id="workout-total-calorie" step="any" inputmode="decimal"></label>
+        </div>
+        <p class="workout-total-hint">
+          유산소·근력을 자동으로 더해요 (칼로리는 "총 소모 칼로리"가 있으면 그 값으로). 직접 고치면 그 값으로 저장돼요.
+          <button type="button" id="workout-total-reset" class="btn-text" style="display:none">자동 합계로 되돌리기</button>
+        </p>
+      </div>
+
+      <p id="workout-error" class="auth-error"></p>
+      <button type="submit" class="btn-primary">저장</button>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928c"></script>
+<script type="module" src="js/app.js?v=20260928d"></script>
 </body>
 </html>
