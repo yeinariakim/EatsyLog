@@ -333,6 +333,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   color: var(--accent);
   margin: 10px 20px 4px;
 }
+.daily-summary:empty { display: none; }
 
 .extras-summary {
   display: flex;
@@ -428,7 +429,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 
 /* ---------- Weight view ---------- */
 .view { padding: 20px 20px 100px; }
-.view-title { font-size: 20px; font-weight: 700; margin: 0 0 16px; }
 .weight-form {
   display: flex;
   gap: 8px;
@@ -709,7 +709,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .fav-summary { color: var(--text-soft); font-size: 13px; }
 .fav-del { flex-shrink: 0; }
 .fav-check { margin: 0; color: var(--text); }
-.fav-check-hint { color: var(--text-soft); font-size: 12px; }
 .ex-fav-btn {
   flex-shrink: 0;
   border: 1px solid var(--line);
@@ -957,19 +956,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   margin: 18px 0 8px;
   min-height: 1em;
 }
-.cal-legend {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-soft);
-}
-.cal-legend span { display: flex; align-items: center; gap: 4px; }
-.cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.cal-dot.done { background: var(--accent); }
-.cal-dot.over { background: var(--warn); }
-.cal-hint { text-align: center; font-size: 11px; color: var(--text-soft); margin: 10px 0 0; }
 /* 길게 누를 때 아이폰 확대경/복사 메뉴가 뜨지 않게 */
 .cal-cell {
   -webkit-touch-callout: none;
@@ -990,7 +976,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   box-shadow: 0 8px 24px rgba(31, 36, 33, 0.12);
   padding: 10px;
 }
-.manual-day-label { margin: 0 0 8px; font-size: 12px; color: var(--text-soft); text-align: center; }
 .manual-day-actions { display: flex; gap: 8px; }
 .manual-day-btn {
   flex: 1;
@@ -1007,7 +992,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .manual-day-btn:active { opacity: 0.8; }
 
 /* ---------- My page ---------- */
-.mypage-email { font-size: 13px; color: var(--text-soft); margin: -8px 0 20px; }
+.mypage-email { font-size: 13px; color: var(--text-soft); margin: 0 0 20px; }
 .mypage-section {
   background: #fff;
   border-radius: var(--radius);
@@ -1016,6 +1001,33 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 }
 .mypage-section-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 0 0 12px; }
 .mypage-section .settings-form { margin-bottom: 0; }
+.mypage-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+.mypage-toggle-row .mypage-section-title { margin: 0; }
+.mypage-section #notify-error:empty { display: none; }
+
+/* 켜기/끄기 스위치 */
+.switch { position: relative; display: inline-block; width: 48px; height: 28px; flex-shrink: 0; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0;
+  background: var(--line);
+  border-radius: 999px;
+  transition: background 0.2s;
+  pointer-events: none;
+}
+.switch-track::after {
+  content: "";
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(31, 36, 33, 0.2);
+  transition: transform 0.2s;
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(20px); }
+.switch input:disabled + .switch-track { opacity: 0.6; }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-mid); outline-offset: 2px; }
 
 /* ---------- Tabbar ---------- */
 .tabbar {
@@ -1074,6 +1086,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   margin-bottom: 16px;
 }
 .modal-header h3 { margin: 0; font-size: 17px; }
+.modal-header .icon-btn { margin-left: auto; } /* 제목이 없는 모달에서도 닫기 버튼은 오른쪽 */
 
 .search-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .search-row input { flex: 1; min-width: 0; }

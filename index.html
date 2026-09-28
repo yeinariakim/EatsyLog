@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260930b">
+<link rel="stylesheet" href="css/style.css?v=20260930e">
 </head>
 <body>
 
@@ -130,7 +130,7 @@
       </div>
     </section>
 
-    <p id="daily-summary" class="daily-summary">기록을 시작해보세요</p>
+    <p id="daily-summary" class="daily-summary"></p>
     <div id="extras-summary" class="extras-summary"></div>
 
     <section class="meals">
@@ -173,7 +173,6 @@
   </main>
 
   <main id="view-weight" class="view" style="display:none">
-    <h2 class="view-title">체중</h2>
     <form id="weight-form" class="weight-form">
       <input type="number" id="weight-input" step="0.1" placeholder="오늘 체중 (kg)" required>
       <button type="submit" class="btn-primary">기록</button>
@@ -207,7 +206,6 @@
   </main>
 
   <main id="view-workout" class="view" style="display:none">
-    <h2 class="view-title">운동</h2>
     <ul id="workout-list" class="workout-list"></ul>
     <button id="add-workout-btn" class="btn-primary workout-add-btn">+ 운동 기록 추가</button>
 
@@ -225,12 +223,11 @@
         </div>
         <p id="progress-summary" class="progress-summary"></p>
       </div>
-      <p id="progress-empty" class="food-list-empty">근력운동 종목을 기록하면 날짜별 최고 무게를 여기서 볼 수 있어요</p>
+      <p id="progress-empty" class="food-list-empty">아직 근력운동 기록이 없어요</p>
     </section>
   </main>
 
   <main id="view-calendar" class="view" style="display:none">
-    <h2 class="view-title">달력</h2>
     <div class="cal-nav">
       <button id="cal-prev" class="date-nav" aria-label="이전 달">◀</button>
       <span id="cal-month-label" class="cal-month-label"></span>
@@ -241,15 +238,9 @@
     </div>
     <div id="cal-grid" class="cal-grid"></div>
     <p id="cal-summary" class="cal-summary"></p>
-    <div class="cal-legend">
-      <span><i class="cal-dot done"></i>목표 달성 (목표 이하)</span>
-      <span><i class="cal-dot over"></i>목표 초과</span>
-    </div>
-    <p class="cal-hint">기록 못 한 날은 길게 눌러서 성공/실패를 직접 표시할 수 있어요</p>
     <!-- 달력 수동 기록 선택창 (길게 누른 칸 옆에 작게 뜸) -->
     <div id="manual-day-backdrop" class="manual-day-backdrop" style="display:none"></div>
     <div id="manual-day-popup" class="manual-day-popup" role="dialog" aria-label="수동 기록" style="display:none">
-      <p id="manual-day-label" class="manual-day-label"></p>
       <div class="manual-day-actions">
         <button type="button" class="manual-day-btn success" data-manual-status="success">성공</button>
         <button type="button" class="manual-day-btn fail" data-manual-status="fail">실패</button>
@@ -258,7 +249,6 @@
   </main>
 
   <main id="view-mypage" class="view" style="display:none">
-    <h2 class="view-title">마이페이지</h2>
     <p id="mypage-email" class="mypage-email"></p>
 
     <section class="mypage-section">
@@ -273,8 +263,14 @@
     </section>
 
     <section class="mypage-section">
-      <p class="mypage-section-title">알림</p>
-      <button id="enable-notifications-btn" class="btn-secondary" style="width:100%">알림 켜기</button>
+      <div class="mypage-toggle-row">
+        <p class="mypage-section-title">알림</p>
+        <label class="switch">
+          <input type="checkbox" id="notify-toggle" role="switch" aria-label="알림">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <p id="notify-error" class="auth-error"></p>
     </section>
 
     <button id="logout-btn" class="btn-text">로그아웃</button>
@@ -309,7 +305,7 @@
     </div>
 
     <div class="search-row">
-      <input type="text" id="food-search" placeholder="음식 이름 검색 (예: 닭가슴살)">
+      <input type="text" id="food-search" placeholder="음식 이름 검색">
       <button id="food-search-btn" class="btn-secondary">검색</button>
     </div>
     <ul id="search-results" class="search-results"></ul>
@@ -333,10 +329,10 @@
       </div>
 
       <div class="extras-block">
-        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <p class="extras-title">추가 항목</p>
         <div id="food-extras-list" class="extras-list"></div>
         <div class="extras-add-row">
-          <input type="text" id="food-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="text" id="food-extra-name" placeholder="이름">
           <input type="number" id="food-extra-value" placeholder="수치" step="any">
           <select id="food-extra-unit">
             <option value="">단위없음</option>
@@ -370,10 +366,10 @@
         <input type="number" id="manual-fat" placeholder="지방 (g)" step="any">
       </div>
       <div class="extras-block">
-        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <p class="extras-title">추가 항목</p>
         <div id="manual-extras-list" class="extras-list"></div>
         <div class="extras-add-row">
-          <input type="text" id="manual-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="text" id="manual-extra-name" placeholder="이름">
           <input type="number" id="manual-extra-value" placeholder="수치" step="any">
           <select id="manual-extra-unit">
             <option value="">단위없음</option>
@@ -401,7 +397,6 @@
 <div id="edit-modal" class="modal-overlay" style="display:none">
   <div class="modal">
     <div class="modal-header">
-      <h3>기록 수정</h3>
       <button id="edit-close" class="icon-btn">닫기</button>
     </div>
     <form id="edit-form" class="manual-entry" style="display:flex">
@@ -436,10 +431,10 @@
       </div>
 
       <div class="extras-block">
-        <p class="extras-title">추가 항목 (카페인, 나트륨 등)</p>
+        <p class="extras-title">추가 항목</p>
         <div id="edit-extras-list" class="extras-list"></div>
         <div class="extras-add-row">
-          <input type="text" id="edit-extra-name" placeholder="이름 (예: 카페인)">
+          <input type="text" id="edit-extra-name" placeholder="이름">
           <input type="number" id="edit-extra-value" placeholder="수치" step="any">
           <select id="edit-extra-unit">
             <option value="">단위없음</option>
@@ -462,7 +457,6 @@
 <div id="workout-modal" class="modal-overlay" style="display:none">
   <div class="modal">
     <div class="modal-header">
-      <h3 id="workout-modal-title">운동 기록 추가</h3>
       <button id="workout-close" class="icon-btn">닫기</button>
     </div>
     <form id="workout-form" class="workout-form">
@@ -480,14 +474,13 @@
         </div>
         <!-- 유산소·기타 즐겨찾기: 누르면 값이 채워진 블록이 추가돼요 (칼로리·심박수는 비어 있음) -->
         <div id="block-fav-section" class="fav-section" style="display:none">
-          <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+          <p class="fav-list-title" aria-label="즐겨찾기">⭐</p>
           <ul id="block-fav-list" class="fav-list"></ul>
         </div>
       </div>
 
       <!-- 합계: 자동으로 더하지만 직접 고칠 수 있음 -->
       <div class="workout-block workout-total-block">
-        <p class="workout-block-title">전체 요약</p>
         <div class="field-grid">
           <div class="field field-wide">총 운동시간
             <span class="time-selects">
@@ -498,7 +491,6 @@
           <label class="field-wide">총 소모 칼로리 (kcal)<input type="number" id="workout-total-calorie" step="any" inputmode="decimal"></label>
         </div>
         <p class="workout-total-hint">
-          모든 블록의 시간·칼로리를 자동으로 더해요. 직접 고치면 그 값으로 저장돼요.
           <button type="button" id="workout-total-reset" class="btn-text" style="display:none">자동 합계로 되돌리기</button>
         </p>
       </div>
@@ -514,6 +506,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260930b"></script>
+<script type="module" src="js/app.js?v=20260930e"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // app.js
 import { UNIT_PRESETS, getUnitById, computeGrams, guessDefaultUnit } from "./units.js";
 import { searchFood, scaleNutrition } from "./nutrition-api.js";
-import { setupNotifications } from "./notifications.js";
+import { setupNotifications, isNotificationEnabled, disableNotifications } from "./notifications.js";
 
 let fb; // firebase refs, set once firebase-config.js signals ready
 let currentUser = null;
@@ -248,8 +248,9 @@ function initAuth() {
       subscribeToInbody();
       subscribeToWorkouts();
       subscribeToWorkoutFavorites();
-      // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
-      // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
+      // iOS Safari는 사용자가 직접 누른 동작이 아니면 알림 권한 요청을 막을 수 있어서,
+      // 여기서는 상태만 확인하고 켜기/끄기는 마이페이지의 알림 스위치에서 해요 (아래 참고)
+      refreshNotificationToggle();
     } else {
       currentUser = null;
       document.getElementById("app").style.display = "none";
@@ -302,15 +303,33 @@ document.getElementById("show-login").addEventListener("click", () => {
   document.getElementById("signup-screen").style.display = "none";
   document.getElementById("auth-screen").style.display = "block";
 });
-document.getElementById("enable-notifications-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("enable-notifications-btn");
-  btn.textContent = "설정 중...";
+// 알림 스위치: 켜면 권한 요청 + 토큰 저장, 끄면 이 기기 토큰 삭제
+// (iOS Safari는 사용자가 직접 누른 동작에서만 권한 요청이 돼서, 스위치를 누를 때 요청해요)
+async function refreshNotificationToggle() {
+  const toggle = document.getElementById("notify-toggle");
   try {
-    await setupNotifications(fb.app, fb.db, fb, currentUser.uid);
-    btn.textContent = "알림 켜짐 ✓";
+    toggle.checked = await isNotificationEnabled(fb.app, fb.db, fb, currentUser.uid);
+  } catch (err) {
+    console.warn("알림 상태 확인 실패", err);
+    toggle.checked = false;
+  }
+}
+
+document.getElementById("notify-toggle").addEventListener("change", async (e) => {
+  const toggle = e.target;
+  const errEl = document.getElementById("notify-error");
+  const turnOn = toggle.checked;
+  errEl.textContent = "";
+  toggle.disabled = true;
+  try {
+    if (turnOn) await setupNotifications(fb.app, fb.db, fb, currentUser.uid);
+    else await disableNotifications(fb.app, fb.db, fb, currentUser.uid);
   } catch (err) {
     console.error("알림 설정 실패:", err);
-    btn.textContent = `실패: ${err.message || err}`;
+    toggle.checked = !turnOn;
+    errEl.textContent = `실패: ${err.message || err}`;
+  } finally {
+    toggle.disabled = false;
   }
 });
 
@@ -568,32 +587,17 @@ function renderGauges(entries = []) {
   renderExtrasSummary(entries);
 }
 
-// 홈 요약의 칼로리 목표 달성 기준: 목표의 90~110%
-function isCalorieOnTarget(calorie) {
-  return calorie >= goals.calorie * 0.9 && calorie <= goals.calorie * 1.1;
-}
-
 // 달력의 "목표 달성" 기준: 칼로리가 목표 이하면 달성 (탄단지는 안 봄, 적게 먹은 날도 달성)
 function isCalendarGoalMet(calorie) {
   return calorie <= goals.calorie;
 }
 
+// 홈 요약: 탄수화물이 목표를 넘었을 때만 경고 한 줄 (그 외에는 비워 둠)
 function renderSummary(totals) {
   const summaryEl = document.getElementById("daily-summary");
-  const carbOk = totals.carb <= goals.carb;
-  const proteinOk = totals.protein >= goals.protein * 0.9;
-  const fatOk = totals.fat >= goals.fat * 0.85 && totals.fat <= goals.fat * 1.15;
-  const calorieOk = isCalorieOnTarget(totals.calorie);
-
-  if (totals.calorie === 0) {
-    summaryEl.textContent = "기록을 시작해보세요";
-  } else if (carbOk && proteinOk && fatOk && calorieOk) {
-    summaryEl.textContent = "오늘 목표 달성! 🎉";
-  } else if (totals.carb > goals.carb) {
-    summaryEl.textContent = `탄수화물이 목표보다 ${Math.round(totals.carb - goals.carb)}g 많아요`;
-  } else {
-    summaryEl.textContent = "오늘 기록 진행 중이에요";
-  }
+  summaryEl.textContent = totals.carb > goals.carb
+    ? `탄수화물이 목표보다 ${Math.round(totals.carb - goals.carb)}g 많아요`
+    : "";
 }
 
 function escapeHtml(str) {
@@ -703,7 +707,7 @@ async function doFoodSearch() {
     return;
   }
   if (finalResults.length === 0) {
-    resultsEl.innerHTML = `<li>검색 결과가 없어요. 다른 단어로 시도하거나 직접 입력해보세요.</li>`;
+    resultsEl.innerHTML = `<li>검색 결과가 없어요</li>`;
     return;
   }
 
@@ -1283,7 +1287,7 @@ function renderInbodyHistory() {
   const el = document.getElementById("inbody-history");
   if (!el) return;
   if (allInbody.length === 0) {
-    el.innerHTML = `<li class="food-list-empty">인바디를 잰 날에만 기록하면 돼요</li>`;
+    el.innerHTML = `<li class="food-list-empty">아직 인바디 기록이 없어요</li>`;
     return;
   }
   const recent = [...allInbody].reverse().slice(0, 30);
@@ -1606,7 +1610,7 @@ function favCheck(d, i) {
   return `
     <label class="checkbox-row fav-check">
       <input type="checkbox" ${bind(i, "saveFav")} ${d.saveFav ? "checked" : ""}>
-      ⭐ 즐겨찾기에 저장 <span class="fav-check-hint">(칼로리·심박수 제외)</span>
+      ⭐ 즐겨찾기에 저장
     </label>`;
 }
 
@@ -1622,7 +1626,7 @@ function renderExercises(d, i) {
     <div class="exercise-list">${d.exercises.map((ex, k) => `
       <div class="exercise-item">
         <div class="exercise-head">
-          <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
+          <input type="text" placeholder="종목 이름" value="${escapeHtml(ex.name)}"
             ${bind(i, "name")} data-ex="${k}" class="exercise-name-input" autocomplete="off">
           ${exFavButton(ex, i, k)}
           <button type="button" class="food-remove" data-act="remove-ex" data-b="${i}" data-ex="${k}">삭제</button>
@@ -1641,7 +1645,7 @@ function renderExercises(d, i) {
     </div>
     <button type="button" class="btn-secondary" data-act="add-ex" data-b="${i}">+ 운동 추가</button>
     <div class="fav-section ex-fav-section"${exerciseFavs().length ? "" : ' style="display:none"'}>
-      <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+      <p class="fav-list-title" aria-label="즐겨찾기">⭐</p>
       <ul class="fav-list ex-fav-list" data-b="${i}">${exerciseFavListHtml(i)}</ul>
     </div>`;
 }
@@ -1649,9 +1653,9 @@ function renderExercises(d, i) {
 function renderBlockBody(d, i) {
   if (d.type === "cardio") {
     return `
-      <input type="text" placeholder="운동 종류 (예: 인터벌 러닝)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+      <input type="text" placeholder="운동 종류" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
       <div class="field-grid">${timeField(d, i)}</div>
-      <textarea rows="2" placeholder="코스명 (예: 마이마운틴 미디움 2번 코스, 3.0-4.5-6.0-8.5 반복*2)" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
+      <textarea rows="2" placeholder="코스명" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
       <div class="field-grid">
         ${numField(d, i, "distanceKm", "거리 (km, 선택)")}
         ${numField(d, i, "calorie", "소모 칼로리 (kcal)")}
@@ -1669,7 +1673,7 @@ function renderBlockBody(d, i) {
       </div>`;
   }
   return `
-    <input type="text" placeholder="이름 (예: 웜업, 턱걸이 연습, 쿨다운 스트레칭)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
+    <input type="text" placeholder="이름" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
     <div class="field-grid">
       ${timeField(d, i)}
       ${numField(d, i, "reps", "횟수 (선택)", "1")}
@@ -2043,7 +2047,6 @@ document.getElementById("workout-total-reset").addEventListener("click", () => {
 function openWorkoutModal(w = null) {
   editingWorkoutId = w ? w.id : null;
   editingWorkoutCreatedAt = w ? (w.createdAt || null) : null;
-  document.getElementById("workout-modal-title").textContent = w ? "운동 기록 수정" : "운동 기록 추가";
   document.getElementById("workout-error").textContent = "";
   document.getElementById("workout-place").value = w?.place ?? "";
 
@@ -2489,8 +2492,6 @@ let manualPopupDate = null;
 
 function openManualDayPopup(btn) {
   manualPopupDate = btn.dataset.calDate;
-  const [, m, d] = manualPopupDate.split("-").map(Number);
-  document.getElementById("manual-day-label").textContent = `${m}월 ${d}일 수동 기록`;
   const popup = document.getElementById("manual-day-popup");
   popup.style.display = "block";
   document.getElementById("manual-day-backdrop").style.display = "block";
