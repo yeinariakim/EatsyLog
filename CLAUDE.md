@@ -23,6 +23,12 @@
   (서비스워커·모듈 때문에 `file://`로 열면 제대로 안 돌아가요.)
 - 코드 주석과 화면 문구는 **한국어**예요. 새로 쓰는 것도 한국어로 맞춰 주세요.
 
+## 작업 규칙 (Git)
+
+- **`main`에 바로 올리지 마세요.** `main`은 GitHub Pages로 바로 배포돼서, 올리는 순간 실제 앱이 바뀌어요.
+- 항상 **새 브랜치에서 작업**하고, 끝나면 그 브랜치를 push한 뒤 **PR을 만들어 주세요.**
+- `main`에 합치는 건 PR을 확인한 다음에 해요.
+
 ## 폴더 구조
 
 ```
@@ -108,6 +114,6 @@ users/{uid}/fcmTokens/{token}
 
 ## 배포
 
-GitHub Pages 배포 브랜치(보통 `main`)에 올리면 바로 반영돼요 (`https://yeinariakim.github.io/eatsylog/`).
+PR이 `main`에 합쳐지면 GitHub Pages에 바로 반영돼요 (`https://yeinariakim.github.io/eatsylog/`).
 알림 스크립트는 GitHub Secret `FIREBASE_SERVICE_ACCOUNT`(서비스 계정 JSON)가 필요해요.
 자세한 초기 설정 방법은 `README.md`를 보세요.
