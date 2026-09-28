@@ -142,6 +142,7 @@ users/{uid}/fcmTokens/{token}
 - 모달은 `openModal(id)` / `closeModal(id)`로 열고 닫아요.
 - 숫자 반올림 규칙: 칼로리는 정수, 탄단지는 소수점 한 자리.
 - iOS Safari는 사용자가 직접 누른 버튼에서만 알림 권한을 요청할 수 있어요.
+- 입력칸(`input`·`select`·`textarea`) 글자는 **16px 이상**으로 해 주세요. 16px보다 작으면 아이폰이 누를 때 화면을 자동으로 확대해요.
 
 ## 배포
 
