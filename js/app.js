@@ -2138,23 +2138,32 @@ function getExerciseNames() {
   return [...names].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
-// 종목마다 한 줄씩 미니 그래프(스파크라인) 목록을 보여주고, 줄을 누르면 그 종목만 큰 그래프로 보여줘요
+// 종목마다 한 줄씩 "최근 최고 무게 + 한 달 전 대비 변화량"을 보여주고, 줄을 누르면 그 종목만 큰 그래프로 보여줘요
 let progressSelected = null; // 크게 보고 있는 종목 이름 (null이면 목록)
 
-// 축·숫자 없이 선 모양만 그리는 작은 그래프. 가로는 기록 순서대로 같은 간격, 마지막(최근) 점만 동그랗게 찍어요
-function sparklineSvg(data) {
-  const W = 72, H = 24, PAD = 3;
-  const svg = (inner) => `<svg class="sparkline" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${inner}</svg>`;
-  if (data.length === 0) return svg("");
-  if (data.length === 1) return svg(`<circle cx="${W / 2}" cy="${H / 2}" r="3"></circle>`);
-  const kgs = data.map(d => d.kg);
-  const min = Math.min(...kgs), max = Math.max(...kgs);
-  const x = (i) => PAD + (W - PAD * 2) * i / (data.length - 1);
-  const y = (kg) => (max === min ? H / 2 : PAD + (H - PAD * 2) * (1 - (kg - min) / (max - min)));
-  const points = data.map((d, i) => `${x(i).toFixed(1)},${y(d.kg).toFixed(1)}`).join(" ");
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dateMs = (date) => new Date(`${date}T00:00:00`).getTime();
+
+// 한 달 전 대비 변화량: 가장 최근 기록 날짜에서 30일 전에 가장 가까운 기록과 비교해요.
+// 딱 30일 전 기록이 없어도 그 근처에서 제일 가까운 걸 쓰지만, 최근 기록과 15일도 안 떨어진 기록은
+// "한 달 전"이라고 보기 어려워서 빼요 → 그런 기록밖에 없으면(시작한 지 얼마 안 됨) null
+function monthAgoChange(data) {
+  if (data.length < 2) return null;
   const last = data[data.length - 1];
-  return svg(`<polyline points="${points}"></polyline>
-    <circle cx="${x(data.length - 1).toFixed(1)}" cy="${y(last.kg).toFixed(1)}" r="2.5"></circle>`);
+  const lastMs = dateMs(last.date);
+  const target = lastMs - 30 * DAY_MS;
+  const candidates = data.slice(0, -1).filter(d => lastMs - dateMs(d.date) >= 15 * DAY_MS);
+  if (candidates.length === 0) return null;
+  const base = candidates.reduce((best, d) =>
+    Math.abs(dateMs(d.date) - target) < Math.abs(dateMs(best.date) - target) ? d : best);
+  return { diff: Math.round((last.kg - base.kg) * 10) / 10, baseDate: base.date };
+}
+
+// "+5kg"(늘었으면 세이지그린) / "-2.5kg"·"±0kg"(회색). 줄어도 경고색은 안 써요
+function formatKgChange(diff) {
+  if (diff > 0) return { text: `+${formatAmount(diff)}kg`, cls: "up" };
+  if (diff < 0) return { text: `-${formatAmount(-diff)}kg`, cls: "down" };
+  return { text: "±0kg", cls: "down" };
 }
 
 function renderProgress() {
@@ -2175,15 +2184,17 @@ function renderProgress() {
   const rows = names.map(name => ({ name, data: maxWeightByDate(name) }))
     .sort((a, b) => lastDate(b.data).localeCompare(lastDate(a.data)) || a.name.localeCompare(b.name, "ko"));
   document.getElementById("progress-list").innerHTML = rows.map(({ name, data }) => {
-    const meta = data.length === 0 ? "무게 없음"
-      : data.length === 1 ? "기록 1회"
-      : `${formatAmount(data[data.length - 1].kg)}kg`;
+    const last = data[data.length - 1];
+    const change = monthAgoChange(data);
+    const chg = change && formatKgChange(change.diff);
     return `
       <li>
         <button type="button" class="progress-row" data-progress-name="${escapeHtml(name)}">
           <span class="progress-row-name">${escapeHtml(name)}</span>
-          ${sparklineSvg(data)}
-          <span class="progress-row-meta">${meta}</span>
+          ${last
+            ? `<span class="progress-row-kg">${formatAmount(last.kg)}<small>kg</small></span>`
+            : `<span class="progress-row-none">무게 없음</span>`}
+          <span class="progress-row-change ${chg ? chg.cls : ""}">${chg ? chg.text : ""}</span>
           <span class="progress-row-chevron" aria-hidden="true">›</span>
         </button>
       </li>`;
@@ -2253,8 +2264,10 @@ function renderProgressChart() {
   } else {
     const first = data[0].kg, last = data[data.length - 1].kg;
     const diff = Math.round((last - first) * 10) / 10;
+    const change = monthAgoChange(data);
     summaryEl.textContent = `처음 ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
-      + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "");
+      + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "")
+      + (change ? `\n한 달 전(${change.baseDate.slice(5)}) 대비 ${formatKgChange(change.diff).text}` : "");
   }
 }
 

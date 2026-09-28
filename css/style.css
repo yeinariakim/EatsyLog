@@ -611,23 +611,27 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sparkline { flex-shrink: 0; overflow: visible; }
-.sparkline polyline {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.sparkline circle { fill: var(--accent); }
-.progress-row-meta {
+.progress-row-kg {
   flex-shrink: 0;
-  width: 64px;
-  text-align: right;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.progress-row-kg small { font-size: 12px; font-weight: 600; margin-left: 1px; color: var(--text-soft); }
+.progress-row-none { flex-shrink: 0; font-size: 12px; color: var(--text-soft); }
+/* 한 달 전 대비 변화량: 늘면 세이지그린, 줄거나 같으면 회색 (경고색은 안 씀) */
+.progress-row-change {
+  flex-shrink: 0;
+  width: 56px;
+  text-align: left;
   white-space: nowrap;
   font-size: 12px;
-  color: var(--text-soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
+.progress-row-change.up { color: var(--accent); }
+.progress-row-change.down { color: var(--text-soft); }
 .progress-row-chevron { flex-shrink: 0; color: var(--text-soft); font-size: 16px; }
 .progress-detail-head { display: flex; align-items: center; gap: 10px; }
 .progress-back {
@@ -648,7 +652,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-summary { font-size: 13px; font-weight: 600; color: var(--accent); margin: 0; text-align: center; }
+.progress-summary { white-space: pre-line; line-height: 1.6; font-size: 13px; font-weight: 600; color: var(--accent); margin: 0; text-align: center; }
 
 /* ---------- Workout modal ---------- */
 .workout-form { display: flex; flex-direction: column; gap: 12px; }
