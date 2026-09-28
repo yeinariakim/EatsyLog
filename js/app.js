@@ -245,6 +245,7 @@ function initAuth() {
       subscribeToWeights();
       subscribeToInbody();
       subscribeToWorkouts();
+      subscribeToWorkoutFavorites();
       // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
       // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
     } else {
@@ -255,6 +256,7 @@ function initAuth() {
       if (weightsUnsub) weightsUnsub();
       if (inbodyUnsub) { inbodyUnsub(); inbodyUnsub = null; }
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
+      if (workoutFavsUnsub) { workoutFavsUnsub(); workoutFavsUnsub = null; }
       if (calendarUnsub) { calendarUnsub(); calendarUnsub = null; }
       switchView("home"); // 다음에 로그인하면 홈부터 보이도록
     }
@@ -1384,6 +1386,25 @@ function subscribeToWorkouts() {
   });
 }
 
+// ----- 운동 즐겨찾기 -----
+// users/{uid}/workoutFavorites/{자동ID}
+//   { kind: "block", blockType: "cardio" | "other", name, course, durationSec, distanceKm, reps, sets, memo, updatedAt }
+//   { kind: "exercise", name, sets: [{ kg, reps, sets }], updatedAt }
+// 칼로리·심박수는 애플워치 실측값이라 매번 달라서 저장하지 않아요 (불러오면 그 두 칸은 비어 있음)
+let workoutFavsUnsub = null;
+let workoutFavs = [];
+
+function subscribeToWorkoutFavorites() {
+  if (workoutFavsUnsub) workoutFavsUnsub();
+  const q = fb.collection(fb.db, "users", currentUser.uid, "workoutFavorites");
+  workoutFavsUnsub = fb.onSnapshot(q, (snap) => {
+    workoutFavs = [];
+    snap.forEach(d => workoutFavs.push({ id: d.id, ...d.data() }));
+    workoutFavs.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
+    refreshWorkoutFavUI();
+  }, (err) => console.error("운동 즐겨찾기 불러오기 실패:", err));
+}
+
 function createdAtMs(w) {
   return w.createdAt && w.createdAt.toMillis ? w.createdAt.toMillis() : 0;
 }
@@ -1520,6 +1541,7 @@ function blockToDraft(b) {
     min: String(Math.floor(sec / 60)), sec: String(sec % 60),
     distanceKm: strOf(b.distanceKm), calorie: strOf(b.calorie), avgHr: strOf(b.avgHr),
     reps: strOf(b.reps), sets: strOf(b.sets),
+    saveFav: false, // 유산소·기타: "즐겨찾기에 저장" 체크 (기록을 저장할 때 같이 저장)
     exercises: (b.exercises || []).map(ex => ({
       name: ex.name || "",
       sets: (ex.sets && ex.sets.length ? ex.sets : [{}]).map(g => ({ kg: strOf(g.kg), reps: strOf(g.reps), sets: strOf(g.sets) }))
@@ -1573,6 +1595,22 @@ function numField(d, i, f, label, step = "any") {
   return `<label>${label}<input type="number" step="${step}" inputmode="${mode}" value="${escapeHtml(d[f])}" ${bind(i, f)}></label>`;
 }
 
+// 유산소·기타 블록의 "즐겨찾기에 저장" 체크박스
+function favCheck(d, i) {
+  return `
+    <label class="checkbox-row fav-check">
+      <input type="checkbox" ${bind(i, "saveFav")} ${d.saveFav ? "checked" : ""}>
+      ⭐ 즐겨찾기에 저장 <span class="fav-check-hint">(칼로리·심박수 제외)</span>
+    </label>`;
+}
+
+// 종목 즐겨찾기 버튼: 같은 이름으로 저장된 게 있으면 ★ (다시 누르면 지금 무게/횟수/세트로 덮어써요)
+function exFavButton(ex, i, k) {
+  const saved = !!findExerciseFav(ex.name);
+  return `<button type="button" class="ex-fav-btn${saved ? " saved" : ""}" data-act="fav-ex" data-b="${i}" data-ex="${k}"
+    aria-label="이 종목 즐겨찾기에 저장">${saved ? "★" : "☆"} 즐겨찾기</button>`;
+}
+
 function renderExercises(d, i) {
   return `
     <div class="exercise-list">${d.exercises.map((ex, k) => `
@@ -1580,6 +1618,7 @@ function renderExercises(d, i) {
         <div class="exercise-head">
           <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
             ${bind(i, "name")} data-ex="${k}" class="exercise-name-input" autocomplete="off">
+          ${exFavButton(ex, i, k)}
           <button type="button" class="food-remove" data-act="remove-ex" data-b="${i}" data-ex="${k}">삭제</button>
         </div>
         <div class="set-row set-row-labels"><span>무게 (kg)</span><span>횟수</span><span>세트</span><span></span></div>
@@ -1594,7 +1633,11 @@ function renderExercises(d, i) {
         <button type="button" class="btn-text" data-act="add-set" data-b="${i}" data-ex="${k}">+ 무게 추가</button>
       </div>`).join("")}
     </div>
-    <button type="button" class="btn-secondary" data-act="add-ex" data-b="${i}">+ 운동 추가</button>`;
+    <button type="button" class="btn-secondary" data-act="add-ex" data-b="${i}">+ 운동 추가</button>
+    <div class="fav-section ex-fav-section"${exerciseFavs().length ? "" : ' style="display:none"'}>
+      <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+      <ul class="fav-list ex-fav-list" data-b="${i}">${exerciseFavListHtml(i)}</ul>
+    </div>`;
 }
 
 function renderBlockBody(d, i) {
@@ -1602,12 +1645,13 @@ function renderBlockBody(d, i) {
     return `
       <input type="text" placeholder="운동 종류 (예: 인터벌 러닝)" value="${escapeHtml(d.name)}" ${bind(i, "name")}>
       <div class="field-grid">${timeField(d, i)}</div>
-      <textarea rows="2" placeholder="코스/프로그램 메모 (예: 마이마운틴 미디움 2번 코스, 3.0-4.5-6.0-8.5 반복*2)" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
+      <textarea rows="2" placeholder="코스명 (예: 마이마운틴 미디움 2번 코스, 3.0-4.5-6.0-8.5 반복*2)" ${bind(i, "course")}>${escapeHtml(d.course)}</textarea>
       <div class="field-grid">
         ${numField(d, i, "distanceKm", "거리 (km, 선택)")}
         ${numField(d, i, "calorie", "소모 칼로리 (kcal)")}
         ${numField(d, i, "avgHr", "평균 심박수 (bpm, 선택)")}
-      </div>`;
+      </div>
+      ${favCheck(d, i)}`;
   }
   if (d.type === "strength") {
     return `
@@ -1626,7 +1670,8 @@ function renderBlockBody(d, i) {
       ${numField(d, i, "sets", "세트 (선택)", "1")}
       ${numField(d, i, "calorie", "소모 칼로리 (선택)")}
     </div>
-    <textarea rows="2" placeholder="메모 (선택)" ${bind(i, "memo")}>${escapeHtml(d.memo)}</textarea>`;
+    <textarea rows="2" placeholder="메모 (선택)" ${bind(i, "memo")}>${escapeHtml(d.memo)}</textarea>
+    ${favCheck(d, i)}`;
 }
 
 function renderWorkoutBlocks() {
@@ -1698,9 +1743,18 @@ function onBlockInput(e) {
     if (t.dataset.set === undefined) ex.name = t.value;
     else ex.sets[Number(t.dataset.set)][t.dataset.f] = t.value;
   } else {
-    d[t.dataset.f] = t.value;
+    d[t.dataset.f] = t.type === "checkbox" ? t.checked : t.value;
   }
-  if (t.classList.contains("exercise-name-input") && e.type === "input") showExerciseSuggest(t);
+  if (t.classList.contains("exercise-name-input")) {
+    if (e.type === "input") showExerciseSuggest(t);
+    // 이름이 바뀌면 그 이름으로 저장된 즐겨찾기가 있는지 ★ 표시만 다시 맞춰요
+    const favBtn = t.parentElement.querySelector('[data-act="fav-ex"]');
+    if (favBtn) {
+      const saved = !!findExerciseFav(t.value);
+      favBtn.classList.toggle("saved", saved);
+      favBtn.textContent = `${saved ? "★" : "☆"} 즐겨찾기`;
+    }
+  }
   updateWorkoutTotals();
 }
 document.getElementById("workout-blocks").addEventListener("input", onBlockInput);
@@ -1719,8 +1773,22 @@ document.getElementById("workout-blocks").addEventListener("click", (e) => {
   const d = blockDraft[i];
   if (!d) return;
   const k = Number(t.dataset.ex);
+  // 즐겨찾기 저장/삭제는 Firestore만 바꾸고, 화면은 구독(refreshWorkoutFavUI)이 알아서 고쳐요
+  if (t.dataset.act === "fav-ex") { saveExerciseFavorite(d.exercises[k]); return; }
+  if (t.dataset.act === "del-fav") { deleteWorkoutFavorite(t.dataset.favId); return; }
   let focusSelector = null;
   switch (t.dataset.act) {
+    case "add-fav-ex": {
+      const fav = workoutFavs.find(f => f.id === t.dataset.favId);
+      if (!fav) return;
+      const ex = favToExercise(fav);
+      // 새 블록의 빈 종목 하나만 있으면 그 자리에 채우고, 아니면 맨 아래에 추가
+      const only = d.exercises.length === 1 ? d.exercises[0] : null;
+      const onlyEmpty = only && !only.name.trim() && only.sets.every(g => g.kg === "" && g.reps === "" && g.sets === "");
+      if (onlyEmpty) d.exercises[0] = ex;
+      else d.exercises.push(ex);
+      break;
+    }
     case "type":
       d.type = t.dataset.type;
       if (d.type === "strength" && d.exercises.length === 0) d.exercises.push(newExercise());
@@ -1767,16 +1835,149 @@ document.getElementById("add-block-btn").addEventListener("click", () => {
   picker.style.display = picker.style.display === "none" ? "flex" : "none";
 });
 
+function appendBlock(draft) {
+  blockDraft.push(draft);
+  document.getElementById("block-type-picker").style.display = "none";
+  renderWorkoutBlocks();
+  updateWorkoutTotals();
+  document.querySelector(`#workout-blocks [data-block-index="${blockDraft.length - 1}"]`)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 document.querySelectorAll("[data-add-block]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    blockDraft.push(newBlock(btn.dataset.addBlock));
-    document.getElementById("block-type-picker").style.display = "none";
-    renderWorkoutBlocks();
-    updateWorkoutTotals();
-    document.querySelector(`#workout-blocks [data-block-index="${blockDraft.length - 1}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  btn.addEventListener("click", () => appendBlock(newBlock(btn.dataset.addBlock)));
 });
+
+// 유산소·기타 즐겨찾기를 누르면 그 값이 채워진 블록을 추가 (칼로리·심박수는 비어 있음)
+document.getElementById("block-fav-list").addEventListener("click", (e) => {
+  const del = e.target.closest("[data-del-fav]");
+  if (del) { deleteWorkoutFavorite(del.dataset.delFav); return; }
+  const pick = e.target.closest("[data-pick-fav]");
+  const fav = pick && workoutFavs.find(f => f.id === pick.dataset.pickFav);
+  if (fav) appendBlock(favToDraft(fav));
+});
+
+// ----- 즐겨찾기 저장·불러오기·목록 -----
+const blockFavs = () => workoutFavs.filter(f => f.kind === "block");
+const exerciseFavs = () => workoutFavs.filter(f => f.kind === "exercise");
+const sameName = (a, b) => (a || "").trim() === (b || "").trim();
+
+function findExerciseFav(name) {
+  return name && name.trim() ? exerciseFavs().find(f => sameName(f.name, name)) : null;
+}
+
+// 유산소는 이름+코스명, 기타는 이름이 같으면 같은 즐겨찾기로 보고 덮어써요
+function findBlockFav(fav) {
+  return blockFavs().find(f => f.blockType === fav.blockType && sameName(f.name, fav.name) &&
+    (fav.blockType !== "cardio" || sameName(f.course, fav.course)));
+}
+
+function favToDraft(f) {
+  return blockToDraft({
+    type: f.blockType, name: f.name, course: f.course, durationSec: f.durationSec,
+    distanceKm: f.distanceKm, reps: f.reps, sets: f.sets, memo: f.memo
+  });
+}
+
+function favToExercise(f) {
+  return blockToDraft({ type: "strength", exercises: [{ name: f.name, sets: f.sets }] }).exercises[0];
+}
+
+// 저장·수정 둘 다: 같은 즐겨찾기가 있으면 그 문서를 덮어쓰고, 없으면 새로 만들어요
+async function putWorkoutFavorite(data, existing) {
+  const col = fb.collection(fb.db, "users", currentUser.uid, "workoutFavorites");
+  const payload = { ...data, updatedAt: fb.serverTimestamp() };
+  if (existing) await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "workoutFavorites", existing.id), payload);
+  else await fb.addDoc(col, payload);
+}
+
+function blockFavData(d) {
+  const b = collectBlock(d);
+  const data = { kind: "block", blockType: b.type, name: b.name, durationSec: b.durationSec };
+  if (b.type === "cardio") Object.assign(data, { course: b.course, distanceKm: b.distanceKm });
+  else Object.assign(data, { reps: b.reps, sets: b.sets, memo: b.memo });
+  return data;
+}
+
+async function saveExerciseFavorite(ex) {
+  if (!ex || !ex.name.trim()) {
+    alert("종목 이름을 먼저 적어 주세요.");
+    return;
+  }
+  const [collected] = collectExercises([ex]);
+  try {
+    await putWorkoutFavorite({ kind: "exercise", name: collected.name, sets: collected.sets }, findExerciseFav(ex.name));
+  } catch (err) {
+    console.error("종목 즐겨찾기 저장 실패:", err);
+    alert("즐겨찾기 저장에 실패했어요. 잠시 후 다시 시도해주세요.");
+  }
+}
+
+async function deleteWorkoutFavorite(id) {
+  if (!id || !confirm("이 즐겨찾기를 삭제할까요?")) return;
+  await fb.deleteDoc(fb.doc(fb.db, "users", currentUser.uid, "workoutFavorites", id));
+}
+
+// "양쪽 5kg, 10개×2세트 / 7.5kg, 8개×1세트"
+function formatSetGroups(sets) {
+  return (sets || []).map(g => {
+    const kg = typeof g.kg === "number" ? `${formatAmount(g.kg)}kg` : "";
+    const rs = [typeof g.reps === "number" ? `${g.reps}개` : "", typeof g.sets === "number" ? `${g.sets}세트` : ""]
+      .filter(Boolean).join("×");
+    return [kg, rs].filter(Boolean).join(", ");
+  }).filter(Boolean).join(" / ");
+}
+
+// 목록 한 줄 요약. 유산소: "마이마운틴 미디움 2번 코스 · 20분 · 1.22km", 기타: "5분 · 5개×3세트"
+function favSummary(f) {
+  if (f.kind === "exercise") return formatSetGroups(f.sets);
+  const reps = [typeof f.reps === "number" ? `${f.reps}개` : "", typeof f.sets === "number" ? `${f.sets}세트` : ""]
+    .filter(Boolean).join("×");
+  return (f.blockType === "cardio"
+    // 거리는 1.22km처럼 소수 둘째 자리까지 적는 경우가 많아서 formatAmount(한 자리) 대신 두 자리로
+    ? [f.course, formatDuration(f.durationSec), typeof f.distanceKm === "number" ? `${Math.round(f.distanceKm * 100) / 100}km` : ""]
+    : [formatDuration(f.durationSec), reps, f.memo]
+  ).filter(Boolean).join(" · ");
+}
+
+function favRowHtml(f, pickAttrs, delAttrs) {
+  const emoji = f.kind === "exercise" ? "" : `${BLOCK_TYPES[f.blockType]?.emoji || ""} `;
+  const summary = favSummary(f);
+  return `
+    <li>
+      <button type="button" class="fav-pick" ${pickAttrs}>
+        <span class="fav-name">${escapeHtml(emoji + (f.name || "(이름 없음)"))}</span>${
+          summary ? `<span class="fav-summary"> · ${escapeHtml(summary)}</span>` : ""}
+      </button>
+      <button type="button" class="extra-remove fav-del" ${delAttrs} aria-label="즐겨찾기 삭제">×</button>
+    </li>`;
+}
+
+function exerciseFavListHtml(i) {
+  return exerciseFavs().map(f =>
+    favRowHtml(f, `data-act="add-fav-ex" data-b="${i}" data-fav-id="${f.id}"`,
+      `data-act="del-fav" data-b="${i}" data-fav-id="${f.id}"`)).join("");
+}
+
+// 즐겨찾기가 바뀌면 목록·★ 표시만 고쳐요 (블록 전체를 다시 그리면 입력 중인 키보드가 닫혀서)
+function refreshWorkoutFavUI() {
+  const favs = blockFavs();
+  document.getElementById("block-fav-section").style.display = favs.length ? "" : "none";
+  document.getElementById("block-fav-list").innerHTML = favs.map(f =>
+    favRowHtml(f, `data-pick-fav="${f.id}"`, `data-del-fav="${f.id}"`)).join("");
+
+  const hasEx = exerciseFavs().length > 0;
+  document.querySelectorAll("#workout-blocks .ex-fav-list").forEach(ul => {
+    ul.innerHTML = exerciseFavListHtml(ul.dataset.b);
+    ul.closest(".ex-fav-section").style.display = hasEx ? "" : "none";
+  });
+  document.querySelectorAll('#workout-blocks [data-act="fav-ex"]').forEach(btn => {
+    const ex = blockDraft[Number(btn.dataset.b)]?.exercises[Number(btn.dataset.ex)];
+    const saved = !!(ex && findExerciseFav(ex.name));
+    btn.classList.toggle("saved", saved);
+    btn.textContent = `${saved ? "★" : "☆"} 즐겨찾기`;
+  });
+}
 
 // ----- 합계 (자동으로 더하지만 직접 고칠 수 있음) -----
 function autoWorkoutTotals() {
@@ -1886,6 +2087,11 @@ document.getElementById("workout-form").addEventListener("submit", async (e) => 
     errEl.textContent = "운동 블록을 하나 이상 추가해 주세요.";
     return;
   }
+  const favDrafts = blockDraft.filter(d => d.saveFav && d.type !== "strength");
+  if (favDrafts.some(d => !d.name.trim())) {
+    errEl.textContent = "즐겨찾기에 저장하려면 운동 종류/이름을 적어 주세요.";
+    return;
+  }
   const data = {
     date: editingWorkoutId ? allWorkouts.find(w => w.id === editingWorkoutId)?.date || currentDate : currentDate,
     place: document.getElementById("workout-place").value.trim(),
@@ -1910,6 +2116,17 @@ document.getElementById("workout-form").addEventListener("submit", async (e) => 
   } catch (err) {
     console.error("운동 기록 저장 실패:", err);
     errEl.textContent = "저장에 실패했어요. 잠시 후 다시 시도해주세요.";
+    return;
+  }
+  // 운동 기록은 이미 저장됐으니, 즐겨찾기가 실패해도 기록은 그대로 두고 알려만 줘요
+  try {
+    for (const d of favDrafts) {
+      const fav = blockFavData(d);
+      await putWorkoutFavorite(fav, findBlockFav(fav));
+    }
+  } catch (err) {
+    console.error("운동 즐겨찾기 저장 실패:", err);
+    alert("운동 기록은 저장했지만, 즐겨찾기 저장에 실패했어요.");
   }
 });
 

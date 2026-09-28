@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260928l">
+<link rel="stylesheet" href="css/style.css?v=20260929a">
 </head>
 <body>
 
@@ -458,9 +458,16 @@
 
       <button type="button" id="add-block-btn" class="btn-secondary">+ 운동 블록 추가</button>
       <div id="block-type-picker" class="block-type-picker" style="display:none">
-        <button type="button" class="pill-toggle" data-add-block="cardio">🏃 유산소</button>
-        <button type="button" class="pill-toggle" data-add-block="strength">🏋️ 근력운동</button>
-        <button type="button" class="pill-toggle" data-add-block="other">🧘 기타</button>
+        <div class="block-type-buttons">
+          <button type="button" class="pill-toggle" data-add-block="cardio">🏃 유산소</button>
+          <button type="button" class="pill-toggle" data-add-block="strength">🏋️ 근력운동</button>
+          <button type="button" class="pill-toggle" data-add-block="other">🧘 기타</button>
+        </div>
+        <!-- 유산소·기타 즐겨찾기: 누르면 값이 채워진 블록이 추가돼요 (칼로리·심박수는 비어 있음) -->
+        <div id="block-fav-section" class="fav-section" style="display:none">
+          <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+          <ul id="block-fav-list" class="fav-list"></ul>
+        </div>
       </div>
 
       <!-- 합계: 자동으로 더하지만 직접 고칠 수 있음 -->
@@ -492,6 +499,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260928l"></script>
+<script type="module" src="js/app.js?v=20260929a"></script>
 </body>
 </html>

@@ -603,7 +603,58 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .workout-form textarea:focus { border-color: var(--accent); }
 .workout-blocks { display: flex; flex-direction: column; gap: 12px; }
 .workout-blocks:empty { display: none; }
-.block-type-picker { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.block-type-picker { display: flex; flex-direction: column; gap: 12px; }
+.block-type-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* 운동 즐겨찾기 */
+.fav-section {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.fav-list-title { font-size: 12px; font-weight: 600; color: var(--text-soft); margin: 0 0 4px; }
+.fav-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.fav-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.fav-list li:last-child { border-bottom: none; }
+.fav-pick {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 14px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fav-pick:active { color: var(--accent); }
+.fav-name { font-weight: 600; }
+.fav-summary { color: var(--text-soft); font-size: 13px; }
+.fav-del { flex-shrink: 0; }
+.fav-check { margin: 0; color: var(--text); }
+.fav-check-hint { color: var(--text-soft); font-size: 12px; }
+.ex-fav-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 10px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ex-fav-btn.saved { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .block-type-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
