@@ -428,7 +428,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 
 /* ---------- Weight view ---------- */
 .view { padding: 20px 20px 100px; }
-.view-title { font-size: 20px; font-weight: 700; margin: 0 0 16px; }
 .weight-form {
   display: flex;
   gap: 8px;
@@ -991,7 +990,7 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .manual-day-btn:active { opacity: 0.8; }
 
 /* ---------- My page ---------- */
-.mypage-email { font-size: 13px; color: var(--text-soft); margin: -8px 0 20px; }
+.mypage-email { font-size: 13px; color: var(--text-soft); margin: 0 0 20px; }
 .mypage-section {
   background: #fff;
   border-radius: var(--radius);
@@ -1000,6 +999,33 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 }
 .mypage-section-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 0 0 12px; }
 .mypage-section .settings-form { margin-bottom: 0; }
+.mypage-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+.mypage-toggle-row .mypage-section-title { margin: 0; }
+.mypage-section #notify-error:empty { display: none; }
+
+/* 켜기/끄기 스위치 */
+.switch { position: relative; display: inline-block; width: 48px; height: 28px; flex-shrink: 0; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0;
+  background: var(--line);
+  border-radius: 999px;
+  transition: background 0.2s;
+  pointer-events: none;
+}
+.switch-track::after {
+  content: "";
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(31, 36, 33, 0.2);
+  transition: transform 0.2s;
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track::after { transform: translateX(20px); }
+.switch input:disabled + .switch-track { opacity: 0.6; }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-mid); outline-offset: 2px; }
 
 /* ---------- Tabbar ---------- */
 .tabbar {

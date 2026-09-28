@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260930b">
+<link rel="stylesheet" href="css/style.css?v=20260930c">
 </head>
 <body>
 
@@ -173,7 +173,6 @@
   </main>
 
   <main id="view-weight" class="view" style="display:none">
-    <h2 class="view-title">체중</h2>
     <form id="weight-form" class="weight-form">
       <input type="number" id="weight-input" step="0.1" placeholder="오늘 체중 (kg)" required>
       <button type="submit" class="btn-primary">기록</button>
@@ -207,7 +206,6 @@
   </main>
 
   <main id="view-workout" class="view" style="display:none">
-    <h2 class="view-title">운동</h2>
     <ul id="workout-list" class="workout-list"></ul>
     <button id="add-workout-btn" class="btn-primary workout-add-btn">+ 운동 기록 추가</button>
 
@@ -230,7 +228,6 @@
   </main>
 
   <main id="view-calendar" class="view" style="display:none">
-    <h2 class="view-title">달력</h2>
     <div class="cal-nav">
       <button id="cal-prev" class="date-nav" aria-label="이전 달">◀</button>
       <span id="cal-month-label" class="cal-month-label"></span>
@@ -252,7 +249,6 @@
   </main>
 
   <main id="view-mypage" class="view" style="display:none">
-    <h2 class="view-title">마이페이지</h2>
     <p id="mypage-email" class="mypage-email"></p>
 
     <section class="mypage-section">
@@ -267,8 +263,14 @@
     </section>
 
     <section class="mypage-section">
-      <p class="mypage-section-title">알림</p>
-      <button id="enable-notifications-btn" class="btn-secondary" style="width:100%">알림 켜기</button>
+      <div class="mypage-toggle-row">
+        <p class="mypage-section-title">알림</p>
+        <label class="switch">
+          <input type="checkbox" id="notify-toggle" role="switch" aria-label="알림">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <p id="notify-error" class="auth-error"></p>
     </section>
 
     <button id="logout-btn" class="btn-text">로그아웃</button>
@@ -472,14 +474,13 @@
         </div>
         <!-- 유산소·기타 즐겨찾기: 누르면 값이 채워진 블록이 추가돼요 (칼로리·심박수는 비어 있음) -->
         <div id="block-fav-section" class="fav-section" style="display:none">
-          <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+          <p class="fav-list-title" aria-label="즐겨찾기">⭐</p>
           <ul id="block-fav-list" class="fav-list"></ul>
         </div>
       </div>
 
       <!-- 합계: 자동으로 더하지만 직접 고칠 수 있음 -->
       <div class="workout-block workout-total-block">
-        <p class="workout-block-title">전체 요약</p>
         <div class="field-grid">
           <div class="field field-wide">총 운동시간
             <span class="time-selects">
@@ -505,6 +506,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260930b"></script>
+<script type="module" src="js/app.js?v=20260930c"></script>
 </body>
 </html>

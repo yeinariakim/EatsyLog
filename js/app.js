@@ -1,7 +1,7 @@
 // app.js
 import { UNIT_PRESETS, getUnitById, computeGrams, guessDefaultUnit } from "./units.js";
 import { searchFood, scaleNutrition } from "./nutrition-api.js";
-import { setupNotifications } from "./notifications.js";
+import { setupNotifications, isNotificationEnabled, disableNotifications } from "./notifications.js";
 
 let fb; // firebase refs, set once firebase-config.js signals ready
 let currentUser = null;
@@ -248,8 +248,9 @@ function initAuth() {
       subscribeToInbody();
       subscribeToWorkouts();
       subscribeToWorkoutFavorites();
-      // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
-      // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
+      // iOS Safari는 사용자가 직접 누른 동작이 아니면 알림 권한 요청을 막을 수 있어서,
+      // 여기서는 상태만 확인하고 켜기/끄기는 마이페이지의 알림 스위치에서 해요 (아래 참고)
+      refreshNotificationToggle();
     } else {
       currentUser = null;
       document.getElementById("app").style.display = "none";
@@ -302,15 +303,33 @@ document.getElementById("show-login").addEventListener("click", () => {
   document.getElementById("signup-screen").style.display = "none";
   document.getElementById("auth-screen").style.display = "block";
 });
-document.getElementById("enable-notifications-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("enable-notifications-btn");
-  btn.textContent = "설정 중...";
+// 알림 스위치: 켜면 권한 요청 + 토큰 저장, 끄면 이 기기 토큰 삭제
+// (iOS Safari는 사용자가 직접 누른 동작에서만 권한 요청이 돼서, 스위치를 누를 때 요청해요)
+async function refreshNotificationToggle() {
+  const toggle = document.getElementById("notify-toggle");
   try {
-    await setupNotifications(fb.app, fb.db, fb, currentUser.uid);
-    btn.textContent = "알림 켜짐 ✓";
+    toggle.checked = await isNotificationEnabled(fb.app, fb.db, fb, currentUser.uid);
+  } catch (err) {
+    console.warn("알림 상태 확인 실패", err);
+    toggle.checked = false;
+  }
+}
+
+document.getElementById("notify-toggle").addEventListener("change", async (e) => {
+  const toggle = e.target;
+  const errEl = document.getElementById("notify-error");
+  const turnOn = toggle.checked;
+  errEl.textContent = "";
+  toggle.disabled = true;
+  try {
+    if (turnOn) await setupNotifications(fb.app, fb.db, fb, currentUser.uid);
+    else await disableNotifications(fb.app, fb.db, fb, currentUser.uid);
   } catch (err) {
     console.error("알림 설정 실패:", err);
-    btn.textContent = `실패: ${err.message || err}`;
+    toggle.checked = !turnOn;
+    errEl.textContent = `실패: ${err.message || err}`;
+  } finally {
+    toggle.disabled = false;
   }
 });
 
@@ -1641,7 +1660,7 @@ function renderExercises(d, i) {
     </div>
     <button type="button" class="btn-secondary" data-act="add-ex" data-b="${i}">+ 운동 추가</button>
     <div class="fav-section ex-fav-section"${exerciseFavs().length ? "" : ' style="display:none"'}>
-      <p class="fav-list-title">⭐ 즐겨찾기에서 추가</p>
+      <p class="fav-list-title" aria-label="즐겨찾기">⭐</p>
       <ul class="fav-list ex-fav-list" data-b="${i}">${exerciseFavListHtml(i)}</ul>
     </div>`;
 }
