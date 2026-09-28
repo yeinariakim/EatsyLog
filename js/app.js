@@ -11,6 +11,7 @@ let goalHistory = [];         // 목표 이력 [{ startDate, calorie, protein, c
 let goalHistoryUnsub = null;
 let goalHistoryMigrating = false; // 예전 목표를 첫 이력으로 옮기는 중이면 true (두 번 만들지 않도록)
 let editingGoalStart = null;  // 지난 목표를 고치는 중이면 그 목표의 시작일
+let goalHistoryOpen = false;  // 마이페이지 목표 변경 이력을 펼쳐 봤는지 (기본은 접힘)
 let entriesUnsub = null;
 let currentEntries = [];      // 홈에 보이는 날짜의 식단 기록 (목표가 바뀌면 게이지를 다시 그릴 때 씀)
 let weightsUnsub = null;
@@ -267,6 +268,7 @@ function initAuth() {
       goalHistory = [];
       goalHistoryMigrating = false;
       currentEntries = [];
+      setGoalHistoryOpen(false); // 다음에 로그인하면 다시 접힌 상태로
       editingGoalStart = null;
       if (inbodyUnsub) { inbodyUnsub(); inbodyUnsub = null; }
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
@@ -457,6 +459,16 @@ function startEditGoal(g) {
 }
 
 document.getElementById("goal-cancel").addEventListener("click", resetGoalForm);
+
+// 목표 변경 이력 접기/펼치기 — 화면에 보이는 방식만 바뀌고, 저장·판정은 그대로예요
+function setGoalHistoryOpen(open) {
+  goalHistoryOpen = open;
+  const btn = document.getElementById("goal-history-toggle");
+  document.getElementById("goal-history").style.display = open ? "" : "none";
+  btn.textContent = open ? "변경 이력 접기" : "변경 이력 보기";
+  btn.setAttribute("aria-expanded", String(open));
+}
+document.getElementById("goal-history-toggle").addEventListener("click", () => setGoalHistoryOpen(!goalHistoryOpen));
 document.getElementById("goal-start-toggle").addEventListener("click", () => {
   showGoalStartField(true);
   document.getElementById("goal-cancel").style.display = ""; // 취소하면 다시 오늘부터로 돌아가요
