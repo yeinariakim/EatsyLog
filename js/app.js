@@ -361,7 +361,24 @@ function subscribeToDate(dateStr) {
   });
 }
 
+// 홈 식사 목록 한 줄 요약: 0인 탄단지는 빼고, 빈 자리만큼 추가 항목(카페인·나트륨 등)을 채워서 보여줌
+// (탄단지 3칸이 기준 — 예: 탄8만 있으면 남는 2칸에 "카30mg 나10mg")
+const MEAL_MACRO_SLOTS = 3;
+function formatEntryMacro(item, extraLabels) {
+  const parts = [["탄", item.carb], ["단", item.protein], ["지", item.fat]]
+    .filter(([, v]) => Number(v) > 0)
+    .map(([label, v]) => `${label}${v}`);
+  const extras = (item.extras || []).filter(ex => Number(ex.value) > 0);
+  extras.slice(0, MEAL_MACRO_SLOTS - parts.length).forEach(ex => {
+    const label = extraLabels[ex.name] || ex.name;
+    parts.push(`${label}${formatAmount(Math.round(ex.value * 10) / 10)}${ex.unit || ""}`);
+  });
+  return [`${item.calorie}kcal`, parts.join(" ")].filter(Boolean).join(" · ");
+}
+
 function renderMeals(entries) {
+  // 위쪽 추가 항목 요약 칩과 같은 줄임말(카·나 등)을 쓰도록 그날 기록 전체 이름으로 만듦
+  const extraLabels = abbreviateExtraNames(Object.keys(computeExtraTotals(entries)));
   ["breakfast", "lunch", "dinner", "snack"].forEach(meal => {
     const list = document.querySelector(`[data-meal-list="${meal}"]`);
     const items = entries.filter(e => e.meal === meal);
@@ -373,7 +390,7 @@ function renderMeals(entries) {
       <li>
         <button class="food-edit-trigger" data-edit="${item.id}">
           <span class="food-name">${escapeHtml(item.name)}${item.amount ? ` <span class="food-amount">${formatAmount(item.amount)}${item.unit}</span>` : ""}</span>
-          <span class="food-macro">${item.calorie}kcal · 탄${item.carb} 단${item.protein} 지${item.fat}</span>
+          <span class="food-macro">${escapeHtml(formatEntryMacro(item, extraLabels))}</span>
         </button>
         <button class="food-remove" data-remove="${item.id}">삭제</button>
       </li>
