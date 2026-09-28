@@ -1,71 +1,138 @@
 # eatsylog
 
-식단(칼로리/탄단지) + 체중 기록 개인 웹앱. GitHub Pages + Firebase.
+먹은 음식(칼로리, 탄수화물·단백질·지방)과 체중을 기록하는 개인용 웹앱이에요.
 
-## 1. 저장소에 파일 올리기
+- 주소: https://yeinariakim.github.io/eatsylog/
+- 화면: **GitHub Pages** (빌드 없이 정적 파일 그대로)
+- 로그인·데이터 저장: **Firebase** (Authentication + Firestore)
+- 음식 영양 정보 검색: **식약처 식품영양성분 API** (data.go.kr)
+- 식사 알림: **GitHub Actions** → **Firebase Cloud Messaging(FCM)**
+
+휴대폰에서 "홈 화면에 추가"하면 앱처럼 쓸 수 있어요 (PWA).
+
+## 할 수 있는 것
+
+화면 아래 탭은 **홈 · 체중 · 추이** 세 개예요.
+
+- **홈**
+  - 날짜를 앞뒤로 넘기며 아침·점심·저녁·간식 기록을 봐요.
+  - 목표 대비 칼로리·탄단지 게이지를 보여줘요. (목표는 오른쪽 위 **설정**에서 바꿔요)
+  - 기록을 누르면 양이나 값을 고칠 수 있고, "삭제" 버튼으로 지울 수 있어요.
+- **음식 추가 방법 3가지**
+  1. **검색**: 식약처 API 결과 + 앱에 넣어둔 자주 먹는 음식 목록을 같이 보여줘요.
+     "1그릇", "1개" 같은 단위와 개수를 고르면 그램으로 바꿔서 영양값을 계산해요.
+  2. **직접 입력**: 이름, 양, 단위(g·ml·개·인분·컵 등), 영양값을 직접 넣어요.
+  3. **즐겨찾기**: 추가할 때 "즐겨찾기에 저장"을 체크해 두면, 다음부터 한 번에 넣을 수 있어요.
+- **추가 항목**: 카페인·나트륨처럼 칼로리와 상관없는 값도 이름/수치/단위로 자유롭게 적을 수 있어요.
+  하루 합계는 홈에 따로 보여줘요.
+- **체중**: 하루에 한 번 체중을 기록하고 그래프로 봐요.
+- **추이**: 최근 30일 칼로리와 탄단지를 차트로 봐요.
+- **알림**: 설정에서 **알림 켜기**를 누르면 매일 08:00 / 11:30 / 19:00(한국 시간)에 기록 알림이 와요.
+  (아이폰은 홈 화면에 추가한 뒤 그 앱에서 버튼을 눌러야 알림을 받을 수 있어요)
+
+## 파일 구성
 
 ```
-git clone https://github.com/yeinariakim/eatsylog.git
-# 이 폴더의 파일들을 저장소에 복사한 뒤
-git add .
-git commit -m "init"
-git push
+index.html               화면 전체 (로그인/회원가입/앱, 팝업들)
+css/style.css            스타일
+manifest.json            홈 화면 설치(PWA)용 정보
+icons/icon.png           앱 아이콘
+firebase-messaging-sw.js 푸시 알림을 띄우는 서비스워커 (루트에 있어야 해요)
+firestore.rules          Firestore 보안 규칙 (본인 데이터만 읽기/쓰기)
+js/
+  firebase-config.js     Firebase 연결 설정
+  app.js                 앱 기능 거의 전부
+  nutrition-api.js       식약처 API 검색과 영양값 계산
+  units.js               "1그릇=250g" 같은 단위 정보
+  notifications.js       알림 권한 받기 + 기기 토큰 저장
+scripts/send-reminder.js 알림 보내는 스크립트 (GitHub Actions에서 실행)
+.github/workflows/reminders.yml  알림 보내는 시간표
 ```
 
-Settings > Pages 에서 배포 브랜치를 설정하면 `https://yeinariakim.github.io/eatsylog/` 로 열려요.
+> `js/firebase-messaging-sw.js`는 예전 파일이라 지금은 쓰지 않아요. 알림 관련 수정은 루트의 같은 이름 파일에 해야 해요.
 
-## 2. Firebase 설정
+## 내 컴퓨터에서 실행해 보기
 
-1. [console.firebase.google.com](https://console.firebase.google.com) 에서 새 프로젝트 생성 (예: `eatsylog`)
-2. 프로젝트 개요 > 웹 앱 추가(</> 아이콘) → 나오는 `firebaseConfig` 값을 복사
-3. `js/firebase-config.js` 와 `firebase-messaging-sw.js` 두 곳의 `YOUR_API_KEY` 등을 실제 값으로 교체
-4. **Authentication** > Sign-in method > "이메일/비밀번호" 사용 설정
-5. **Firestore Database** 만들기 (프로덕션 모드로 시작해도 OK, 아래 규칙을 적용하면 됨)
-   - Firestore Rules 탭에 이 저장소의 `firestore.rules` 내용을 붙여넣고 게시
-6. **Cloud Messaging** > 웹 구성 > "웹 푸시 인증서" 생성 → 나오는 키 값을 `js/notifications.js`의 `VAPID_KEY`에 채우기
-7. 알림 발송용 서비스 계정 키 발급: 프로젝트 설정 > 서비스 계정 > "새 비공개 키 생성" → JSON 파일 다운로드
+빌드 과정이나 `npm install`이 필요 없어요. 폴더에서 로컬 서버만 띄우면 돼요.
 
-## 3. 식약처 식품영양성분 API 키
+```
+python3 -m http.server 8000
+```
 
-1. [data.go.kr](https://www.data.go.kr/data/15127578/openapi.do) 에서 "식품의약품안전처_식품영양성분DB정보"에 활용신청 (개발단계는 자동승인)
-2. 발급받은 **일반 인증키(Decoding 값)**를 `js/nutrition-api.js` 의 `API_KEY` 에 넣기
-3. 실제 엔드포인트: `https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02`
-4. **중요**: 응답의 영양성분 값이 `AMT_NUM1`, `AMT_NUM3`처럼 번호로 된 필드라, 어떤 번호가 어떤 영양소인지는
-   반드시 상세 페이지의 "참고문서 → 출력메세지_식품영양성분DB정보.xlsx"로 확정해야 해요.
-   지금 코드는 1=에너지, 3=단백질, 4=지방, 6=탄수화물로 맞춰뒀는데, 첫 검색 결과가 이상하게 나오면
-   (예: 사과인데 단백질이 비정상적으로 높다) 캡처해서 알려주시면 바로 고쳐드릴게요.
+그 다음 브라우저에서 http://localhost:8000 을 열어요.
+(`index.html`을 더블클릭해서 `file://`로 열면 제대로 동작하지 않아요)
 
-## 4. 알림(GitHub Actions) 설정
+## 처음부터 새로 설정하는 방법
 
-1. 6번에서 받은 서비스 계정 JSON 파일 전체 내용을 복사
-2. 저장소 Settings > Secrets and variables > Actions > New repository secret
+지금 저장소에는 아래 값들이 이미 채워져 있어요. 다른 Firebase 프로젝트나 새 키로 바꿀 때만 따라 하면 돼요.
+
+### 1. GitHub Pages
+
+저장소 **Settings > Pages**에서 배포 브랜치(보통 `main`)를 고르면 끝이에요.
+그 브랜치에 올리면 바로 사이트에 반영돼요.
+
+### 2. Firebase
+
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만들어요.
+2. **프로젝트 설정 > 일반 > 웹 앱 추가**를 하고, 나오는 `firebaseConfig` 값을 `js/firebase-config.js`에 넣어요.
+3. **Authentication > Sign-in method**에서 "이메일/비밀번호"를 켜요.
+4. **Firestore Database**를 만들고, **규칙** 탭에 이 저장소의 `firestore.rules` 내용을 붙여넣고 게시해요.
+5. **프로젝트 설정 > 클라우드 메시징 > 웹 푸시 인증서**에서 키를 만들어 `js/notifications.js`의 `VAPID_KEY`에 넣어요.
+6. **프로젝트 설정 > 서비스 계정 > 새 비공개 키 생성**으로 JSON 파일을 받아 둬요. (4번 알림 설정에서 써요)
+
+### 3. 식약처 식품영양성분 API
+
+1. [data.go.kr](https://www.data.go.kr/data/15127578/openapi.do)에서 "식품의약품안전처_식품영양성분DB정보"를 활용신청해요. (개발 단계는 자동 승인)
+2. 받은 **일반 인증키(Decoding 값)**를 `js/nutrition-api.js`의 `API_KEY`에 넣어요.
+
+참고로 응답 필드는 번호로 되어 있어요.
+
+| 필드 | 뜻 |
+| --- | --- |
+| `AMT_NUM1` | 칼로리 (kcal) |
+| `AMT_NUM3` | 단백질 (g) |
+| `AMT_NUM4` | 지방 (g) |
+| `AMT_NUM6` | 탄수화물 (g) |
+
+값은 모두 **100g 기준**이에요. 같은 음식은 평균값 하나로 묶고, 검색어와 딱 맞는 것이나 원재료를 위로 올려서 보여줘요.
+
+### 4. 알림 (GitHub Actions)
+
+1. 저장소 **Settings > Secrets and variables > Actions > New repository secret**에서
    - 이름: `FIREBASE_SERVICE_ACCOUNT`
-   - 값: JSON 파일 내용 전체 붙여넣기
-3. `.github/workflows/reminders.yml` 이 매일 8:00 / 11:30 / 19:00 (KST) 에 자동 실행돼요.
-4. Actions 탭에서 "Run workflow" 버튼으로 수동 테스트도 가능해요.
+   - 값: 2-6번에서 받은 JSON 파일 내용 전체
+2. `.github/workflows/reminders.yml`이 매일 08:00 / 11:30 / 19:00(한국 시간)에 알아서 실행돼요.
+3. **Actions** 탭에서 "Run workflow"를 누르면 바로 테스트할 수 있어요.
+
+알림 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준, 한국 시간 − 9시간)과
+`scripts/send-reminder.js`의 `slots`를 **같이** 고쳐야 해요. 문구도 `send-reminder.js`에서 바꿔요.
 
 ## 데이터 구조 (Firestore)
 
+모든 데이터는 `users/{uid}` 아래에 저장돼요.
+
 ```
 users/{uid}
-  goals: { calorie, protein, carb, fat }
+  goals: { calorie, protein, carb, fat }          목표값
 
-users/{uid}/entries/{entryId}
-  date, meal (breakfast|lunch|dinner|snack), name, calorie, protein, carb, fat, createdAt
+users/{uid}/entries/{자동ID}                      먹은 기록 하나
+  date("YYYY-MM-DD"), meal(breakfast|lunch|dinner|snack), name,
+  calorie, protein, carb, fat,                    실제 먹은 양 기준 값
+  amount, unit,                                   양과 단위 (검색으로 넣으면 unit="g")
+  perUnitCalorie, perUnitProtein, perUnitCarb, perUnitFat,   1단위당 값 (양 수정할 때 사용)
+  extras: [{ name, value, unit }],                추가 항목 (카페인 등)
+  createdAt
 
-users/{uid}/weights/{date}
+users/{uid}/weights/{날짜}                        하루 한 개
   date, kg
 
-users/{uid}/favorites/{favId}
-  name, calorie, protein, carb, fat
+users/{uid}/favorites/{자동ID}                    즐겨찾기
+  name, unit, basis("per100" | "perUnit"),
+  per100 또는 perUnit: { calorie, protein, carb, fat },
+  defaultAmount, extras
 
-users/{uid}/fcmTokens/{token}
+users/{uid}/fcmTokens/{토큰}                      알림 받을 기기
   token, updatedAt
 ```
 
-## 아직 안 채운 부분
-
-- `js/firebase-config.js`, `firebase-messaging-sw.js` — Firebase 프로젝트 값
-- `js/nutrition-api.js` — 식약처 API 키 + 실제 응답 필드명 확인
-- `js/notifications.js` — VAPID 키
-- `manifest.json` icons — 앱 아이콘 이미지 있으면 추가 (선택)
+새 컬렉션을 만들면 `firestore.rules`에도 규칙을 꼭 추가해 주세요.
