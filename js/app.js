@@ -10,7 +10,6 @@ let goals = { calorie: 1450, protein: 105, carb: 40, fat: 95 };
 let entriesUnsub = null;
 let weightsUnsub = null;
 let allWeights = [];
-let allEntriesForTrend = []; // last 30 days, for the trend chart
 let pendingMeal = null;      // which meal the food modal is adding to
 let selectedFoodPer100 = null;
 let referenceServingGrams = null; // this food's own "1회 섭취참고량", if the API provided one
@@ -20,8 +19,9 @@ let favoriteExtrasBasisAmount = null; // 위 extras가 원래 몇 그램/몇 개
 let calendarUnsub = null;
 let calendarMonth = currentDate.slice(0, 7); // 달력에 보이는 달 "YYYY-MM"
 let calendarTotals = {};                      // 그 달의 { "YYYY-MM-DD": 칼로리 합계 } (기록 있는 날만)
-let weightChart, trendChart;
-let trendMode = "calorie";
+let workoutsUnsub = null;
+let allWorkouts = [];      // 운동 기록 전체 (날짜별 목록 + 종목별 무게 추이에 같이 씀)
+let weightChart, progressChart;
 
 // 기록에 붙이는 "양" 단위 — 그램 환산용 UNIT_PRESETS와는 별개로, 그냥 표시용 라벨이에요
 const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
@@ -240,6 +240,7 @@ function initAuth() {
       await loadGoals();
       subscribeToDate(currentDate);
       subscribeToWeights();
+      subscribeToWorkouts();
       // iOS Safari는 사용자가 직접 누른 버튼이 아니면 알림 권한 요청을 막을 수 있어서,
       // 마이페이지의 "알림 켜기" 버튼으로 옮김 (아래 참고)
     } else {
@@ -248,6 +249,7 @@ function initAuth() {
       document.getElementById("auth-screen").style.display = "block";
       if (entriesUnsub) entriesUnsub();
       if (weightsUnsub) weightsUnsub();
+      if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
       if (calendarUnsub) { calendarUnsub(); calendarUnsub = null; }
       switchView("home"); // 다음에 로그인하면 홈부터 보이도록
     }
@@ -337,12 +339,13 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
 });
 
 // ---------- Date navigation ----------
-// 홈에서 보는 날짜를 바꿈 (오늘 이후로는 못 감) — 달력에서 날짜를 눌렀을 때도 이걸 써요
+// 홈·체중·운동 탭이 같이 보는 날짜를 바꿈 (오늘 이후로는 못 감) — 달력에서 날짜를 눌렀을 때도 이걸 써요
 function setCurrentDate(dateStr) {
   if (dateStr > todayStr()) return;
   currentDate = dateStr;
   document.getElementById("current-date-label").textContent = formatDateLabel(currentDate);
   subscribeToDate(currentDate);
+  renderWorkoutList();
 }
 document.getElementById("date-prev").addEventListener("click", () => {
   setCurrentDate(addDays(currentDate, -1));
@@ -480,7 +483,7 @@ function formatAmount(n) {
 
 // ---------- Tabs ----------
 // 위쪽 날짜 이동(‹ 오늘 ›)은 날짜별로 보는 탭에서만 보여줘요 (달력·마이페이지는 숨김)
-const VIEWS_WITH_DATE_BAR = ["home", "weight", "trend"];
+const VIEWS_WITH_DATE_BAR = ["home", "weight", "workout"];
 
 function switchView(view) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -489,7 +492,7 @@ function switchView(view) {
   document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";
   if (!currentUser) return;
   if (view === "weight") renderWeightChart();
-  if (view === "trend") loadTrendData();
+  if (view === "workout") renderProgressChart(); // 숨겨진 캔버스에는 차트가 제대로 안 그려져서, 보일 때 다시 그림
   if (view === "calendar") {
     calendarMonth = currentDate.slice(0, 7); // 홈에서 보던 날짜의 달부터 보여줌
     subscribeToCalendarMonth();
@@ -1074,88 +1077,387 @@ function renderWeightChart() {
   });
 }
 
-// ---------- Trend ----------
-document.querySelectorAll(".trend-tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".trend-tab").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    trendMode = btn.dataset.trend;
-    renderTrendChart();
+// ---------- Workouts (운동) ----------
+// users/{uid}/workouts/{자동ID}
+//   date, place, cardio: {...} | null, strength: {...} | null,
+//   totalMinutes, totalCalorie, totalMinutesManual, totalCalorieManual, createdAt
+// 기록 양이 많지 않아서 전체를 한 번에 구독하고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요
+let editingWorkoutId = null;
+let editingWorkoutCreatedAt = null;
+let workoutBlocks = { cardio: false, strength: false }; // 모달에서 켠 블록
+let exerciseDraft = [];                                 // [{ name, sets: [{ kg, reps, sets }] }]
+
+function subscribeToWorkouts() {
+  if (workoutsUnsub) workoutsUnsub();
+  const q = fb.collection(fb.db, "users", currentUser.uid, "workouts");
+  workoutsUnsub = fb.onSnapshot(q, (snap) => {
+    allWorkouts = [];
+    snap.forEach(d => allWorkouts.push({ id: d.id, ...d.data() }));
+    renderWorkoutList();
+    renderProgressOptions();
+    if (document.getElementById("view-workout").style.display !== "none") renderProgressChart();
+  });
+}
+
+function createdAtMs(w) {
+  return w.createdAt && w.createdAt.toMillis ? w.createdAt.toMillis() : 0;
+}
+
+// 목록 한 줄 요약: "🏃 인터벌 러닝 20분 · 🏋️ 근력 21분 · 총 335kcal"
+function formatWorkoutSummary(w) {
+  const parts = [];
+  if (w.cardio) {
+    parts.push(`🏃 ${w.cardio.type || "유산소"}${w.cardio.minutes ? ` ${formatAmount(w.cardio.minutes)}분` : ""}`);
+  }
+  if (w.strength) {
+    parts.push(`🏋️ 근력${w.strength.minutes ? ` ${formatAmount(w.strength.minutes)}분` : ""}`);
+  }
+  if (w.totalCalorie) parts.push(`총 ${Math.round(w.totalCalorie)}kcal`);
+  return parts.join(" · ");
+}
+
+function renderWorkoutList() {
+  const list = document.getElementById("workout-list");
+  if (!list) return;
+  const items = allWorkouts
+    .filter(w => w.date === currentDate)
+    .sort((a, b) => createdAtMs(a) - createdAtMs(b));
+  if (items.length === 0) {
+    list.innerHTML = `<li class="food-list-empty">아직 운동 기록이 없어요</li>`;
+    return;
+  }
+  list.innerHTML = items.map(w => {
+    const exerciseNames = (w.strength?.exercises || []).map(ex => ex.name).filter(Boolean);
+    const detail = [w.place, exerciseNames.join(", ")].filter(Boolean).join(" · ");
+    return `
+      <li>
+        <button class="workout-edit-trigger" data-workout-edit="${w.id}">
+          <span class="workout-summary">${escapeHtml(formatWorkoutSummary(w))}</span>
+          ${detail ? `<span class="workout-detail">${escapeHtml(detail)}</span>` : ""}
+        </button>
+        <button class="food-remove" data-workout-remove="${w.id}">삭제</button>
+      </li>`;
+  }).join("");
+
+  list.querySelectorAll("[data-workout-edit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const w = allWorkouts.find(x => x.id === btn.dataset.workoutEdit);
+      if (w) openWorkoutModal(w);
+    });
+  });
+  list.querySelectorAll("[data-workout-remove]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      // 운동 기록은 적을 게 많아서, 실수로 지우지 않게 한 번 물어봐요
+      if (!confirm("이 운동 기록을 삭제할까요?")) return;
+      await fb.deleteDoc(fb.doc(fb.db, "users", currentUser.uid, "workouts", btn.dataset.workoutRemove));
+    });
+  });
+}
+
+// ----- 운동 기록 모달 -----
+const numOrNull = (id) => {
+  const v = document.getElementById(id).value.trim();
+  return v === "" ? null : Number(v);
+};
+const setVal = (id, v) => { document.getElementById(id).value = v ?? ""; };
+
+function setWorkoutBlock(block, on) {
+  workoutBlocks[block] = on;
+  document.getElementById(`${block}-block`).style.display = on ? "flex" : "none";
+  document.querySelector(`.pill-toggle[data-block="${block}"]`).classList.toggle("active", on);
+  if (on && block === "strength" && exerciseDraft.length === 0) {
+    exerciseDraft.push(newExercise());
+    renderExerciseList();
+  }
+  updateWorkoutTotals();
+}
+
+document.querySelectorAll(".pill-toggle[data-block]").forEach(btn => {
+  btn.addEventListener("click", () => setWorkoutBlock(btn.dataset.block, !workoutBlocks[btn.dataset.block]));
+});
+
+function newExercise() {
+  return { name: "", sets: [{ kg: "", reps: "", sets: "" }] };
+}
+
+function renderExerciseList() {
+  const el = document.getElementById("exercise-list");
+  el.innerHTML = exerciseDraft.map((ex, i) => `
+    <div class="exercise-item">
+      <div class="exercise-head">
+        <input type="text" placeholder="종목 이름 (예: 스미스머신 스쿼트)" value="${escapeHtml(ex.name)}"
+          data-ex="${i}" data-field="name" list="exercise-name-options">
+        <button type="button" class="food-remove" data-ex-remove="${i}">삭제</button>
+      </div>
+      <div class="set-row set-row-labels"><span>무게 (kg)</span><span>횟수</span><span>세트</span><span></span></div>
+      ${ex.sets.map((g, j) => `
+        <div class="set-row">
+          <input type="number" step="any" inputmode="decimal" value="${g.kg ?? ""}" data-ex="${i}" data-set="${j}" data-field="kg">
+          <input type="number" step="1" inputmode="numeric" value="${g.reps ?? ""}" data-ex="${i}" data-set="${j}" data-field="reps">
+          <input type="number" step="1" inputmode="numeric" value="${g.sets ?? ""}" data-ex="${i}" data-set="${j}" data-field="sets">
+          <button type="button" class="extra-remove" data-set-remove="${i}-${j}" aria-label="이 무게 삭제"
+            ${ex.sets.length === 1 ? "disabled" : ""}>×</button>
+        </div>`).join("")}
+      <button type="button" class="btn-text" data-set-add="${i}">+ 무게 추가</button>
+    </div>
+  `).join("") + `<datalist id="exercise-name-options">${
+    getExerciseNames().map(n => `<option value="${escapeHtml(n)}">`).join("")
+  }</datalist>`;
+}
+
+// 입력은 상태(exerciseDraft)에만 반영 — 매번 다시 그리면 휴대폰 키보드가 닫혀서, 추가/삭제할 때만 다시 그림
+document.getElementById("exercise-list").addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.dataset.ex === undefined) return;
+  const ex = exerciseDraft[Number(t.dataset.ex)];
+  if (t.dataset.field === "name") ex.name = t.value;
+  else ex.sets[Number(t.dataset.set)][t.dataset.field] = t.value;
+});
+
+document.getElementById("exercise-list").addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.dataset.exRemove !== undefined) {
+    exerciseDraft.splice(Number(t.dataset.exRemove), 1);
+  } else if (t.dataset.setAdd !== undefined) {
+    // 무게만 바꿔서 이어가는 경우가 많아서, 횟수·세트는 바로 위 값을 그대로 채워 줌
+    const sets = exerciseDraft[Number(t.dataset.setAdd)].sets;
+    const last = sets[sets.length - 1] || {};
+    sets.push({ kg: "", reps: last.reps ?? "", sets: last.sets ?? "" });
+  } else if (t.dataset.setRemove !== undefined) {
+    const [i, j] = t.dataset.setRemove.split("-").map(Number);
+    exerciseDraft[i].sets.splice(j, 1);
+  } else {
+    return;
+  }
+  renderExerciseList();
+});
+
+document.getElementById("add-exercise-btn").addEventListener("click", () => {
+  exerciseDraft.push(newExercise());
+  renderExerciseList();
+  const inputs = document.querySelectorAll('#exercise-list [data-field="name"]');
+  inputs[inputs.length - 1]?.focus();
+});
+
+// 합계 자동 계산: 켜진 블록의 시간을 더하고, 칼로리는 "총 소모 칼로리"가 있으면 그걸, 없으면 "소모 칼로리"를 더함
+function autoWorkoutTotals() {
+  let minutes = 0, calorie = 0;
+  ["cardio", "strength"].forEach(block => {
+    if (!workoutBlocks[block]) return;
+    minutes += numOrNull(`${block}-minutes`) || 0;
+    calorie += numOrNull(`${block}-total-calorie`) ?? numOrNull(`${block}-calorie`) ?? 0;
+  });
+  return { minutes, calorie: Math.round(calorie) };
+}
+
+function updateWorkoutTotals() {
+  const auto = autoWorkoutTotals();
+  const minEl = document.getElementById("workout-total-minutes");
+  const calEl = document.getElementById("workout-total-calorie");
+  if (!minEl.dataset.manual) minEl.value = auto.minutes || "";
+  if (!calEl.dataset.manual) calEl.value = auto.calorie || "";
+  document.getElementById("workout-total-reset").style.display =
+    (minEl.dataset.manual || calEl.dataset.manual) ? "inline" : "none";
+}
+
+["cardio-minutes", "cardio-calorie", "cardio-total-calorie",
+ "strength-minutes", "strength-calorie", "strength-total-calorie"].forEach(id => {
+  document.getElementById(id).addEventListener("input", updateWorkoutTotals);
+});
+
+// 합계 칸을 직접 고치면 그 값을 유지 (비우면 다시 자동 계산)
+["workout-total-minutes", "workout-total-calorie"].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener("input", () => {
+    if (el.value.trim() === "") delete el.dataset.manual;
+    else el.dataset.manual = "1";
+    updateWorkoutTotals();
   });
 });
 
-async function loadTrendData() {
-  const startDate = addDays(todayStr(), -29);
-  const q = fb.query(
-    fb.collection(fb.db, "users", currentUser.uid, "entries"),
-    fb.where("date", ">=", startDate)
-  );
-  const snap = await new Promise(resolve => {
-    const unsub = fb.onSnapshot(q, (s) => { resolve(s); unsub(); });
-  });
-  allEntriesForTrend = [];
-  snap.forEach(d => allEntriesForTrend.push(d.data()));
-  renderTrendChart();
+document.getElementById("workout-total-reset").addEventListener("click", () => {
+  delete document.getElementById("workout-total-minutes").dataset.manual;
+  delete document.getElementById("workout-total-calorie").dataset.manual;
+  updateWorkoutTotals();
+});
+
+function openWorkoutModal(w = null) {
+  editingWorkoutId = w ? w.id : null;
+  editingWorkoutCreatedAt = w ? (w.createdAt || null) : null;
+  document.getElementById("workout-modal-title").textContent = w ? "운동 기록 수정" : "운동 기록 추가";
+  document.getElementById("workout-error").textContent = "";
+  setVal("workout-place", w?.place);
+
+  const c = w?.cardio || {};
+  setVal("cardio-type", c.type);
+  setVal("cardio-course", c.course);
+  setVal("cardio-minutes", c.minutes);
+  setVal("cardio-distance", c.distanceKm);
+  setVal("cardio-calorie", c.calorie);
+  setVal("cardio-total-calorie", c.totalCalorie);
+  setVal("cardio-hr", c.avgHr);
+
+  const st = w?.strength || {};
+  setVal("strength-minutes", st.minutes);
+  setVal("strength-calorie", st.calorie);
+  setVal("strength-total-calorie", st.totalCalorie);
+  setVal("strength-hr", st.avgHr);
+  exerciseDraft = (st.exercises || []).map(ex => ({
+    name: ex.name || "",
+    sets: (ex.sets && ex.sets.length ? ex.sets : [{}]).map(g => ({ kg: g.kg ?? "", reps: g.reps ?? "", sets: g.sets ?? "" }))
+  }));
+  renderExerciseList();
+
+  const minEl = document.getElementById("workout-total-minutes");
+  const calEl = document.getElementById("workout-total-calorie");
+  delete minEl.dataset.manual;
+  delete calEl.dataset.manual;
+  if (w?.totalMinutesManual) { minEl.dataset.manual = "1"; minEl.value = w.totalMinutes ?? ""; }
+  if (w?.totalCalorieManual) { calEl.dataset.manual = "1"; calEl.value = w.totalCalorie ?? ""; }
+
+  // 새 기록은 둘 다 켠 상태로 시작 (헬스장에서는 보통 둘 다 해서) — 안 한 쪽은 눌러서 끄면 돼요
+  setWorkoutBlock("cardio", w ? !!w.cardio : true);
+  setWorkoutBlock("strength", w ? !!w.strength : true);
+  openModal("workout-modal");
 }
 
-function renderTrendChart() {
-  const ctx = document.getElementById("trend-chart");
-  if (!ctx || typeof Chart === "undefined") return;
+document.getElementById("add-workout-btn").addEventListener("click", () => openWorkoutModal());
+document.getElementById("workout-close").addEventListener("click", () => closeModal("workout-modal"));
 
-  const days = [];
-  for (let i = 29; i >= 0; i--) days.push(addDays(todayStr(), -i));
+function collectExercises() {
+  const toNum = v => (v === "" || v === null || v === undefined) ? null : Number(v);
+  return exerciseDraft
+    .map(ex => ({
+      name: ex.name.trim(),
+      sets: ex.sets
+        .map(g => ({ kg: toNum(g.kg), reps: toNum(g.reps), sets: toNum(g.sets) }))
+        .filter(g => g.kg !== null || g.reps !== null || g.sets !== null)
+    }))
+    .filter(ex => ex.name || ex.sets.length);
+}
 
+document.getElementById("workout-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById("workout-error");
+  if (!workoutBlocks.cardio && !workoutBlocks.strength) {
+    errEl.textContent = "유산소나 근력운동 중 하나는 켜 주세요.";
+    return;
+  }
+  const minEl = document.getElementById("workout-total-minutes");
+  const calEl = document.getElementById("workout-total-calorie");
+  const data = {
+    date: editingWorkoutId ? allWorkouts.find(w => w.id === editingWorkoutId)?.date || currentDate : currentDate,
+    place: document.getElementById("workout-place").value.trim(),
+    cardio: workoutBlocks.cardio ? {
+      type: document.getElementById("cardio-type").value.trim(),
+      course: document.getElementById("cardio-course").value.trim(),
+      minutes: numOrNull("cardio-minutes"),
+      distanceKm: numOrNull("cardio-distance"),
+      calorie: numOrNull("cardio-calorie"),
+      totalCalorie: numOrNull("cardio-total-calorie"),
+      avgHr: numOrNull("cardio-hr")
+    } : null,
+    strength: workoutBlocks.strength ? {
+      minutes: numOrNull("strength-minutes"),
+      exercises: collectExercises(),
+      calorie: numOrNull("strength-calorie"),
+      totalCalorie: numOrNull("strength-total-calorie"),
+      avgHr: numOrNull("strength-hr")
+    } : null,
+    totalMinutes: numOrNull("workout-total-minutes"),
+    totalCalorie: numOrNull("workout-total-calorie"),
+    totalMinutesManual: !!minEl.dataset.manual,
+    totalCalorieManual: !!calEl.dataset.manual
+  };
+  try {
+    if (editingWorkoutId) {
+      await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid, "workouts", editingWorkoutId), {
+        ...data, createdAt: editingWorkoutCreatedAt || fb.serverTimestamp()
+      });
+    } else {
+      await fb.addDoc(fb.collection(fb.db, "users", currentUser.uid, "workouts"), {
+        ...data, createdAt: fb.serverTimestamp()
+      });
+    }
+    closeModal("workout-modal");
+  } catch (err) {
+    console.error("운동 기록 저장 실패:", err);
+    errEl.textContent = "저장에 실패했어요. 잠시 후 다시 시도해주세요.";
+  }
+});
+
+// ----- 무게 추이 (종목별 날짜마다 최고 무게) -----
+function getExerciseNames() {
+  const names = new Set();
+  allWorkouts.forEach(w => (w.strength?.exercises || []).forEach(ex => {
+    if (ex.name && ex.name.trim()) names.add(ex.name.trim());
+  }));
+  return [...names].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+function renderProgressOptions() {
+  const select = document.getElementById("progress-exercise");
+  const names = getExerciseNames();
+  const prev = select.value;
+  document.getElementById("progress-body").style.display = names.length ? "" : "none";
+  document.getElementById("progress-empty").style.display = names.length ? "none" : "";
+  select.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (names.includes(prev)) select.value = prev;
+}
+
+document.getElementById("progress-exercise").addEventListener("change", renderProgressChart);
+
+function maxWeightByDate(name) {
   const byDate = {};
-  days.forEach(d => byDate[d] = { calorie: 0, protein: 0, carb: 0, fat: 0 });
-  allEntriesForTrend.forEach(e => {
-    if (byDate[e.date]) {
-      byDate[e.date].calorie += e.calorie || 0;
-      byDate[e.date].protein += e.protein || 0;
-      byDate[e.date].carb += e.carb || 0;
-      byDate[e.date].fat += e.fat || 0;
+  allWorkouts.forEach(w => (w.strength?.exercises || []).forEach(ex => {
+    if ((ex.name || "").trim() !== name) return;
+    (ex.sets || []).forEach(g => {
+      if (typeof g.kg === "number" && (byDate[w.date] === undefined || g.kg > byDate[w.date])) byDate[w.date] = g.kg;
+    });
+  }));
+  return Object.keys(byDate).sort().map(date => ({ date, kg: byDate[date] }));
+}
+
+function renderProgressChart() {
+  const ctx = document.getElementById("progress-chart");
+  const name = document.getElementById("progress-exercise").value;
+  if (!ctx || typeof Chart === "undefined") return;
+  if (progressChart) { progressChart.destroy(); progressChart = null; }
+  const summaryEl = document.getElementById("progress-summary");
+  if (!name) { summaryEl.textContent = ""; return; }
+
+  const data = maxWeightByDate(name);
+  progressChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.map(d => d.date.slice(5)),
+      datasets: [{
+        data: data.map(d => d.kg),
+        borderColor: "#5B7B6C",
+        backgroundColor: "rgba(91,123,108,0.08)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `최고 ${c.parsed.y}kg` } }
+      },
+      scales: { y: { beginAtZero: false, ticks: { callback: (v) => `${v}kg` } } }
     }
   });
 
-  if (trendChart) trendChart.destroy();
-
-  if (trendMode === "calorie") {
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: days.map(d => d.slice(5)),
-        datasets: [{
-          data: days.map(d => byDate[d].calorie),
-          borderColor: "#5B7B6C",
-          backgroundColor: "rgba(91,123,108,0.08)",
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0
-        }]
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          annotation: undefined
-        },
-        scales: { x: { ticks: { maxTicksLimit: 6 } } }
-      }
-    });
+  if (data.length === 0) {
+    summaryEl.textContent = "무게를 적은 기록이 아직 없어요";
+  } else if (data.length === 1) {
+    summaryEl.textContent = `${data[0].date.slice(5)} 최고 ${formatAmount(data[0].kg)}kg`;
   } else {
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: days.map(d => d.slice(5)),
-        datasets: [
-          { label: "탄수화물", data: days.map(d => byDate[d].carb), borderColor: "#B8763E", tension: 0.3, pointRadius: 0 },
-          { label: "단백질", data: days.map(d => byDate[d].protein), borderColor: "#5B7B6C", tension: 0.3, pointRadius: 0 },
-          { label: "지방", data: days.map(d => byDate[d].fat), borderColor: "#8FA89A", tension: 0.3, pointRadius: 0 }
-        ]
-      },
-      options: {
-        plugins: { legend: { display: true, position: "bottom" } },
-        scales: { x: { ticks: { maxTicksLimit: 6 } } }
-      }
-    });
+    const first = data[0].kg, last = data[data.length - 1].kg;
+    const diff = Math.round((last - first) * 10) / 10;
+    summaryEl.textContent = `처음 ${formatAmount(first)}kg → 최근 ${formatAmount(last)}kg`
+      + (diff > 0 ? ` (+${formatAmount(diff)}kg)` : diff < 0 ? ` (${formatAmount(diff)}kg)` : "");
   }
 }
 
