@@ -47,7 +47,12 @@
 index.html               화면 전체 (로그인/회원가입/앱, 모달들). 탭: 운동 · 달력 · 홈 · 체중 · 마이페이지
 css/style.css            스타일
 manifest.json            홈 화면에 설치(PWA)용 정보
-icons/icon.png           앱 아이콘
+icons/                   브랜드 에셋
+  app-icon.png           앱 아이콘 원본 (ivory 배경 + sage 심볼)
+  icon-192/512.png, apple-touch-icon.png, favicon-32.png   app-icon.png에서 만든 크기별 아이콘
+  logo-lockup.png        심볼 + 글자 가로형 로고 (로그인 화면)
+  logo-symbol.png        심볼만 (탭 상단 브랜드 자리)
+  wordmark.png           글자만
 firebase-messaging-sw.js 푸시 알림 서비스워커 (★ 실제로 쓰이는 파일, 루트에 있어야 함)
 firestore.rules          Firestore 보안 규칙 (본인 데이터만 읽기/쓰기)
 js/
@@ -185,6 +190,9 @@ users/{uid}/fcmTokens/{token}
 - 모달은 `openModal(id)` / `closeModal(id)`로 열고 닫아요.
 - 숫자 반올림 규칙: 칼로리는 정수, 탄단지는 소수점 한 자리.
 - iOS Safari는 사용자가 직접 누른 버튼에서만 알림 권한을 요청할 수 있어요.
+- **브랜드 톤**: warm ivory 배경(`--bg`) + sage green(`--accent`) 중심으로 차분하고 튀지 않게 맞춰요.
+  로고 에셋 색은 `css/style.css`의 팔레트 변수와 똑같아요. 태그라인은 "eat easy. log simply." (로그인 화면에만 작게).
+  탭 상단에는 작은 심볼 + 탭 이름(`.brandbar`, 이름은 `switchView()`가 탭바 라벨에서 가져와요)이 있어요.
 - 입력칸(`input`·`select`·`textarea`) 글자는 **16px 이상**으로 해 주세요. 16px보다 작으면 아이폰이 누를 때 화면을 자동으로 확대해요.
 
 ## 배포

@@ -80,6 +80,16 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
+  line-height: 0;
+}
+.logo-lockup { width: 168px; height: auto; display: block; }
+/* 태그라인은 로고 바로 아래 작게 — 눈에 띄지 않게 보조적으로 */
+.auth-tagline {
+  font-size: 13px;
+  color: var(--text-soft);
+  opacity: 0.75;
+  letter-spacing: 0.01em;
+  margin: -4px 0 12px;
 }
 .auth-sub {
   color: var(--text-soft);
@@ -151,6 +161,17 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   font-size: 13px;
   min-height: 18px;
 }
+
+/* ---------- Brandbar (탭 상단 작은 심볼 + 탭 이름) ---------- */
+.brandbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 20px 0;
+}
+.brand-symbol { width: 18px; height: auto; display: block; }
+.brand-title { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+.brandbar + .topbar { padding-top: 8px; }
 
 /* ---------- Topbar ---------- */
 .topbar {
