@@ -1024,9 +1024,6 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .mypage-toggle-row .mypage-section-title { margin: 0; }
 .mypage-section #notify-error:empty { display: none; }
 .goal-start-toggle { align-self: flex-start; padding: 0; font-size: 13px; }
-.goal-history-toggle { display: block; margin: 12px 0 0; padding: 0; font-size: 13px; }
-.goal-history { margin-top: 8px; border-top: 1px solid var(--line); }
-.goal-history .goal-now { font-size: 11px; font-weight: 600; color: var(--accent); margin-left: 4px; }
 
 /* 켜기/끄기 스위치 */
 .switch { position: relative; display: inline-block; width: 48px; height: 28px; flex-shrink: 0; }

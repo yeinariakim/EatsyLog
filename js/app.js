@@ -10,8 +10,6 @@ let goals = { calorie: 1450, protein: 105, carb: 40, fat: 95 }; // 목표 이력
 let goalHistory = [];         // 목표 이력 [{ startDate, calorie, protein, carb, fat }] (시작일순)
 let goalHistoryUnsub = null;
 let goalHistoryMigrating = false; // 예전 목표를 첫 이력으로 옮기는 중이면 true (두 번 만들지 않도록)
-let editingGoalStart = null;  // 지난 목표를 고치는 중이면 그 목표의 시작일
-let goalHistoryOpen = false;  // 마이페이지 목표 변경 이력을 펼쳐 봤는지 (기본은 접힘)
 let entriesUnsub = null;
 let currentEntries = [];      // 홈에 보이는 날짜의 식단 기록 (목표가 바뀌면 게이지를 다시 그릴 때 씀)
 let weightsUnsub = null;
@@ -268,8 +266,6 @@ function initAuth() {
       goalHistory = [];
       goalHistoryMigrating = false;
       currentEntries = [];
-      setGoalHistoryOpen(false); // 다음에 로그인하면 다시 접힌 상태로
-      editingGoalStart = null;
       if (inbodyUnsub) { inbodyUnsub(); inbodyUnsub = null; }
       if (workoutsUnsub) { workoutsUnsub(); workoutsUnsub = null; }
       if (workoutFavsUnsub) { workoutFavsUnsub(); workoutFavsUnsub = null; }
@@ -354,7 +350,8 @@ document.getElementById("logout-btn").addEventListener("click", async () => {
 // 목표는 "언제부터 적용했는지"와 같이 이력으로 쌓아요: users/{uid}/goalHistory/{시작일}
 // 어떤 날짜의 목표 = 그 날짜 이전(당일 포함)에 시작한 목표 중 가장 최근 것.
 // 그래서 목표를 바꿔도 지난 날짜의 달력 성공/실패·홈 게이지는 그때 목표 그대로예요.
-// 맨 처음 목표는 시작일이 FIRST_GOAL_START("처음부터")라서 모든 지난 날짜를 덮어요. 이건 지우거나 시작일을 바꿀 수 없어요.
+// 맨 처음 목표는 시작일이 FIRST_GOAL_START("처음부터")라서 모든 지난 날짜를 덮어요.
+// 이력은 화면에 목록으로 보여주지 않아요 — 지난 날짜의 목표는 홈 게이지·달력에서 그날 기준으로 보여요.
 // users/{uid}.goals 는 예전 방식 값 — 이력이 하나도 없을 때 첫 이력으로 옮기는 데 쓰고, 오늘 목표로 맞춰 둬요.
 const GOAL_KEYS = ["calorie", "protein", "carb", "fat"];
 const FIRST_GOAL_START = "0000-01-01";
@@ -404,7 +401,6 @@ function subscribeToGoalHistory() {
     goalHistory = [];
     snap.forEach(d => goalHistory.push({ ...d.data(), startDate: d.id }));
     if (first && goalHistory.length > 0) { first = false; resetGoalForm(); }
-    renderGoalHistory();
     renderGauges();
     renderCalendar(); // 목표 이력이 바뀌면 달력의 달성 여부도 다시 계산
   }, (err) => console.warn("목표 이력 불러오기 실패", err));
@@ -423,52 +419,23 @@ function fillGoalForm(g) {
   document.getElementById("goal-fat").value = g.fat;
 }
 
-// 날짜 칸 보이기/숨기기 — 숨기면 "다른 날짜부터 적용" 버튼을 대신 보여줘요 (withToggle=false면 버튼도 숨김)
-function showGoalStartField(show, withToggle = true) {
+// 날짜 칸 보이기/숨기기 — 숨기면 "다른 날짜부터 적용" 버튼을 대신 보여줘요
+function showGoalStartField(show) {
   document.getElementById("goal-start-label").style.display = show ? "" : "none";
-  document.getElementById("goal-start-toggle").style.display = !show && withToggle ? "" : "none";
+  document.getElementById("goal-start-toggle").style.display = show ? "none" : "";
 }
 
 // 기본 상태: 오늘부터 적용할 새 목표 (칸에는 지금 목표를 채워 둠). 날짜 칸은 숨겨 둬요
 function resetGoalForm() {
-  editingGoalStart = null;
   const startEl = document.getElementById("goal-start");
   startEl.value = todayStr();
   startEl.max = todayStr();
-  startEl.required = true;
   showGoalStartField(false);
   fillGoalForm(goalsFor(todayStr()));
-  document.getElementById("settings-save-btn").textContent = "저장";
   document.getElementById("goal-cancel").style.display = "none";
-  renderGoalHistory();
-}
-
-function startEditGoal(g) {
-  editingGoalStart = g.startDate;
-  // "처음부터" 목표는 시작일이 없어서 날짜 칸을 숨겨요
-  const isFirst = g.startDate === FIRST_GOAL_START;
-  const startEl = document.getElementById("goal-start");
-  startEl.value = isFirst ? "" : g.startDate;
-  startEl.required = !isFirst;
-  showGoalStartField(!isFirst, false);
-  fillGoalForm(g);
-  document.getElementById("settings-save-btn").textContent = "수정";
-  document.getElementById("goal-cancel").style.display = "";
-  renderGoalHistory();
-  document.getElementById("settings-form").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 document.getElementById("goal-cancel").addEventListener("click", resetGoalForm);
-
-// 목표 변경 이력 접기/펼치기 — 화면에 보이는 방식만 바뀌고, 저장·판정은 그대로예요
-function setGoalHistoryOpen(open) {
-  goalHistoryOpen = open;
-  const btn = document.getElementById("goal-history-toggle");
-  document.getElementById("goal-history").style.display = open ? "" : "none";
-  btn.textContent = open ? "변경 이력 접기" : "변경 이력 보기";
-  btn.setAttribute("aria-expanded", String(open));
-}
-document.getElementById("goal-history-toggle").addEventListener("click", () => setGoalHistoryOpen(!goalHistoryOpen));
 document.getElementById("goal-start-toggle").addEventListener("click", () => {
   showGoalStartField(true);
   document.getElementById("goal-cancel").style.display = ""; // 취소하면 다시 오늘부터로 돌아가요
@@ -477,7 +444,7 @@ document.getElementById("goal-start-toggle").addEventListener("click", () => {
 
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const startDate = editingGoalStart === FIRST_GOAL_START ? FIRST_GOAL_START : document.getElementById("goal-start").value;
+  const startDate = document.getElementById("goal-start").value;
   if (!startDate) return;
   if (startDate > todayStr()) { alert("오늘 이후 날짜부터 적용할 수는 없어요"); return; }
   const values = pickGoalValues({
@@ -488,21 +455,18 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
   });
   const exists = goalHistory.some(g => g.startDate === startDate);
   // 오늘 목표를 다시 바꾸는 건 그냥 덮어써요. 그 외에 이미 있는 시작일로 저장하면 한 번 물어봐요
-  const isTodayUpdate = !editingGoalStart && startDate === todayStr();
-  if (exists && startDate !== editingGoalStart && !isTodayUpdate
+  if (exists && startDate !== todayStr()
     && !confirm(`${goalStartLabel(startDate)} 적용한 목표가 이미 있어요. 덮어쓸까요?`)) return;
 
   // 저장 후 이력을 미리 계산해서, 오늘 목표를 users/{uid}.goals 에도 맞춰 둬요
   const nextHistory = goalHistory
-    .filter(g => g.startDate !== startDate && g.startDate !== editingGoalStart)
+    .filter(g => g.startDate !== startDate)
     .concat({ startDate, ...values })
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   goals = pickGoalValues(goalsFor(todayStr(), nextHistory));
 
   try {
     await fb.setDoc(goalHistoryRef(startDate), { startDate, ...values, updatedAt: fb.serverTimestamp() });
-    // 고치면서 시작일을 바꿨으면 예전 시작일 문서는 지워요 (문서 ID = 시작일이라서)
-    if (editingGoalStart && editingGoalStart !== startDate) await fb.deleteDoc(goalHistoryRef(editingGoalStart));
     await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
   } catch (err) {
     console.error("목표 저장 실패", err);
@@ -512,43 +476,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
   resetGoalForm();
   const saveBtn = document.getElementById("settings-save-btn");
   saveBtn.textContent = "저장됨 ✓";
-  setTimeout(() => { if (!editingGoalStart) saveBtn.textContent = "저장"; }, 1500);
+  setTimeout(() => { saveBtn.textContent = "저장"; }, 1500);
 });
-
-function renderGoalHistory() {
-  const el = document.getElementById("goal-history");
-  if (!el) return;
-  const current = goalHistory.length ? goalsFor(todayStr()).startDate : null;
-  el.innerHTML = [...goalHistory].reverse().map(g => `
-    <li>
-      <button type="button" class="inbody-edit-trigger${g.startDate === editingGoalStart ? " editing" : ""}" data-goal-edit="${escapeHtml(g.startDate)}">
-        <span class="w-date">${escapeHtml(goalStartLabel(g.startDate))}${g.startDate === current ? ` <b class="goal-now">지금</b>` : ""}</span>
-        <span class="inbody-values">${g.calorie}kcal · <i>단</i>${g.protein} <i>탄</i>${g.carb} <i>지</i>${g.fat}</span>
-      </button>
-      ${g.startDate === FIRST_GOAL_START ? "" : `<button type="button" class="food-remove" data-goal-remove="${escapeHtml(g.startDate)}">삭제</button>`}
-    </li>
-  `).join("");
-
-  el.querySelectorAll("[data-goal-edit]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const g = goalHistory.find(x => x.startDate === btn.dataset.goalEdit);
-      if (g) startEditGoal(g);
-    });
-  });
-  el.querySelectorAll("[data-goal-remove]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const startDate = btn.dataset.goalRemove;
-      if (goalHistory.length <= 1) { alert("목표가 하나뿐이라 지울 수 없어요"); return; }
-      const isFirst = goalHistory[0].startDate === startDate;
-      if (!confirm(`${goalStartLabel(startDate)} 적용한 목표를 삭제할까요?\n이 기간은 ${isFirst ? "다음" : "바로 앞"} 목표로 계산돼요.`)) return;
-      const nextHistory = goalHistory.filter(g => g.startDate !== startDate);
-      goals = pickGoalValues(goalsFor(todayStr(), nextHistory));
-      await fb.deleteDoc(goalHistoryRef(startDate));
-      await fb.setDoc(fb.doc(fb.db, "users", currentUser.uid), { goals }, { merge: true });
-      if (editingGoalStart === startDate) resetGoalForm();
-    });
-  });
-}
 
 // ---------- Date navigation ----------
 // 홈·체중·운동 탭이 같이 보는 날짜를 바꿈 (오늘 이후로는 못 감) — 달력에서 날짜를 눌렀을 때도 이걸 써요
