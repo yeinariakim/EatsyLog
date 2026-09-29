@@ -16,11 +16,12 @@ service cloud.firestore {
       match /favorites/{favId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+      // 운동 기록은 In2Size 앱으로 옮겼어요. 예전 기록은 백업으로 남겨 두고 읽기만 허용해요
       match /workouts/{workoutId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
       }
       match /workoutFavorites/{favId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
       }
       match /goalHistory/{startDate} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
