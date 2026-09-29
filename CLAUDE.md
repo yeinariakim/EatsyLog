@@ -10,6 +10,8 @@
 - 로그인과 데이터 저장은 **Firebase**(Authentication + Firestore)를 써요.
 - 음식 영양 정보는 **식약처 식품영양성분 API**(data.go.kr)에서 검색해요.
 - 식사 알림은 **GitHub Actions**가 정해진 시간에 **Firebase Cloud Messaging(FCM)** 으로 보내요.
+- **운동 기록은 다른 앱(In2Size)으로 옮겼어요.** 이 앱에는 운동 탭이 없어요.
+  Firestore의 예전 운동 기록(`workouts`, `workoutFavorites`)은 백업으로만 남아 있어요 (읽기 전용).
 
 ## 꼭 알아둘 점
 
@@ -44,7 +46,7 @@
 ## 폴더 구조
 
 ```
-index.html               화면 전체 (로그인/회원가입/앱, 모달들). 탭: 운동 · 달력 · 홈 · 체중 · 마이페이지
+index.html               화면 전체 (로그인/회원가입/앱, 모달들). 탭: 달력 · 홈 · 체중 · 마이페이지
 css/style.css            스타일
 manifest.json            홈 화면에 설치(PWA)용 정보
 icons/                   브랜드 에셋
@@ -79,25 +81,9 @@ scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 �
    - **즐겨찾기**: 저장해 둔 기준(`per100` 또는 `perUnit`)으로 다시 계산해서 넣어요.
 5. **추가 항목(extras)**: 카페인·나트륨처럼 칼로리와 상관없는 값을 이름/수치/단위로 자유롭게 기록해요.
    양을 바꾸면 비율대로 같이 바뀌고, 하루 합계는 이름별로 더해서 홈에 보여줘요.
-6. 홈·체중·운동 탭은 위쪽 날짜 이동(‹ 오늘 ›)을 같이 써요. 날짜 라벨을 누르면 작은 날짜 선택 창(`openDatePicker()`)이 떠요.
+6. 홈·체중 탭은 위쪽 날짜 이동(‹ 오늘 ›)을 같이 써요. 날짜 라벨을 누르면 작은 날짜 선택 창(`openDatePicker()`)이 떠요.
    날짜는 항상 `setCurrentDate()`로 바꿔요 (오늘 이후는 막혀 있음). 날짜 선택 창에서는 기록한 날 숫자 아래에 점이 찍혀요.
-   어떤 기록인지는 지금 탭을 따라가요 (홈 = 식단, 체중 = 체중 기록(인바디 제외), 운동 = 운동). 홈은 창이 열려 있는 동안만 그 달 식단 기록을 따로 구독해요.
-   **운동** 탭은 그 날짜의 운동 기록을 보여줘요. 기록 하나는 "운동 블록" 여러 개를 순서대로 쌓아 만들어요
-   (유산소 / 근력운동 / 기타 중 골라서 원하는 만큼 추가·삭제·순서 바꾸기). 시간은 분·초(10초 단위) 드롭다운으로 적고,
-   근력운동은 종목마다 여러 무게(세트 그룹)를 적어요. 총 시간·칼로리는 모든 블록을 자동으로 더하지만 직접 고칠 수 있어요.
-   모달 입력값은 `blockDraft`에 문자열로 들고 있다가 저장할 때 숫자로 바꿔요.
-   종목 이름 추천은 `<datalist>` 대신 직접 만든 목록(`showExerciseSuggest()`)을 써요 (아이폰에서 datalist가 들쭉날쭉해서).
-   목록에서는 기록마다 유산소(종류별)·근력·기타·총합을 한 줄씩(줄 높이 고정), 오른쪽에 시간·칼로리를 보여줘요.
-   맨 아래 줄은 장소·종목 요약 + 오른쪽 끝 "삭제"예요.
-   **운동 즐겨찾기**(`workoutFavs`): 유산소·기타 블록은 "즐겨찾기에 저장"을 체크하고 기록을 저장하면 블록 설정값이 저장되고,
-   "+ 운동 블록 추가" 아래 목록에서 눌러 불러와요. 근력운동은 종목마다 "☆ 즐겨찾기" 버튼으로 종목 이름+무게/횟수/세트를 저장하고,
-   근력 블록 안 목록에서 눌러 종목을 추가해요. **칼로리·심박수는 애플워치 실측값이라 저장하지 않아요** (불러오면 비어 있음).
-   같은 이름(유산소는 이름+코스명)으로 다시 저장하면 새로 만들지 않고 덮어써요.
-   아래 "무게 추이 보기"는 근력 종목마다 한 줄씩 이름 + 최근 최고 무게(크게) + 한 달 전 대비 변화량(작게)을 보여줘요 (`renderProgress()`).
-   변화량(`monthAgoChange()`)은 최근 기록 날짜의 30일 전에 가장 가까운 기록과 비교하고, 최근 기록과 15일 이상 떨어진 기록이 없으면(새로 시작한 운동) 처음 기록과 비교해요. 기록이 1번뿐이면 안 보여줘요.
-   늘면 세이지그린 알약(`.kg-change.up`) "+", 줄거나 같으면 연한 회색 글자 — 경고색(빨강/앰버)은 쓰지 않아요. 무게는 모두 "그날 최고 무게" 기준이에요.
-   줄을 누르면(`progressSelected`) 그 종목만 Chart.js 큰 라인 그래프로 보여주고, "‹ 전체 종목"으로 목록에 돌아가요.
-   (운동 기록은 전체를 한 번에 구독해서 `allWorkouts`에 두고, 날짜 목록·무게 추이 둘 다 여기서 걸러 써요)
+   어떤 기록인지는 지금 탭을 따라가요 (홈 = 식단, 체중 = 체중 기록(인바디 제외)). 홈은 창이 열려 있는 동안만 그 달 식단 기록을 따로 구독해요.
 7. **달력** 탭은 한 달 기록을 구독해서 날짜별 칼로리 달성 정도를 작은 도넛링으로 보여줘요.
    달력의 "달성"은 칼로리가 **그날 목표** 이하인 날이에요 (`isCalendarGoalMet()`, 목표는 `goalsFor(date)`로 찾아요). 홈 링 아래 요약 줄은 탄수화물이 목표를 넘었을 때만 경고를 보여줘요.
    연속 달성 바(스트릭)도 이 기준으로 계산해요. 날짜를 누르면 홈으로 이동해요.
@@ -148,22 +134,8 @@ users/{uid}/favorites/{자동ID}
   per100 또는 perUnit: { calorie, protein, carb, fat },
   defaultAmount, extras
 
-users/{uid}/workouts/{자동ID}         운동 한 번 기록
-  date, place,
-  blocks: [ 적은 순서대로
-    { type: "cardio",   name, durationSec, course(화면 라벨 "코스명"), distanceKm, calorie, avgHr }
-    { type: "strength", durationSec, exercises: [{ name, sets: [{ kg, reps, sets }] }], calorie, avgHr }
-    { type: "other",    name, durationSec, reps, sets, calorie, memo }   (웜업·쿨다운·맨몸운동 등)
-  ],
-  totalSec, totalCalorie,
-  totalTimeManual, totalCalorieManual  (true면 자동 합계 대신 직접 적은 값), createdAt
-  (선택 칸을 비우면 null로 저장해요. 시간은 모두 "초" 단위)
-  (예전 형식 cardio/strength/totalMinutes 문서는 workoutBlocksOf()·workoutTotalSec()가 읽을 때 바꿔 줘요.
-   수정해서 저장하면 새 형식으로 덮어써요)
-
-users/{uid}/workoutFavorites/{자동ID}  운동 즐겨찾기 (칼로리·심박수는 저장 안 함)
-  { kind: "block", blockType: "cardio" | "other", name, course, durationSec, distanceKm, reps, sets, memo, updatedAt }
-  { kind: "exercise", name, sets: [{ kg, reps, sets }], updatedAt }   (근력운동은 종목 하나 단위)
+users/{uid}/workouts/{자동ID}, users/{uid}/workoutFavorites/{자동ID}
+  예전 운동 기록 백업이에요. 앱에서는 더 이상 쓰지 않고, 규칙도 읽기만 허용해요 (지우지 마세요)
 
 users/{uid}/manualDayStatus/{date}   달력 수동 기록 (문서 ID = 날짜, 식단 기록 없는 날에만)
   date, status("success" | "fail"), updatedAt
