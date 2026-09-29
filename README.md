@@ -48,7 +48,12 @@
 index.html               화면 전체 (로그인/회원가입/앱, 팝업들)
 css/style.css            스타일
 manifest.json            홈 화면 설치(PWA)용 정보
-icons/icon.png           앱 아이콘
+icons/                   브랜드 에셋
+  app-icon.png           앱 아이콘 원본 (ivory 배경 + sage 심볼)
+  icon-192/512.png, apple-touch-icon.png, favicon-32.png   app-icon.png에서 만든 크기별 아이콘
+  logo-lockup.png        심볼 + 글자 가로형 로고 (로그인 화면)
+  logo-symbol.png        심볼만 (탭 상단 브랜드 자리)
+  wordmark.png           글자만
 firebase-messaging-sw.js 푸시 알림을 띄우는 서비스워커 (루트에 있어야 해요)
 firestore.rules          Firestore 보안 규칙 (본인 데이터만 읽기/쓰기)
 js/

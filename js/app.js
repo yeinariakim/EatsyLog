@@ -731,6 +731,9 @@ function switchView(view) {
   // 날짜 선택 창의 점은 탭마다 다른 기록을 보여줘서, 탭을 바꾸면 창을 닫아요
   if (document.getElementById("date-picker").style.display === "block") closeDatePicker();
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  // 위쪽 브랜드 자리의 탭 이름은 아래 탭바 라벨을 그대로 가져와요
+  const tabLabel = document.querySelector(`.tab-btn[data-view="${view}"] .tab-label`);
+  if (tabLabel) document.getElementById("brand-title").textContent = tabLabel.textContent;
   document.querySelectorAll(".view").forEach(v => v.style.display = "none");
   document.getElementById(`view-${view}`).style.display = "block";
   document.getElementById("topbar").style.display = VIEWS_WITH_DATE_BAR.includes(view) ? "" : "none";

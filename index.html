@@ -6,9 +6,9 @@
 <title>eatsylog</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#FAFAF8">
-<link rel="icon" href="icons/icon.png" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260930j">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css?v=20260930k">
 </head>
 <body>
 
@@ -23,7 +23,8 @@
 <!-- 로그인 화면 -->
 <div id="auth-screen" class="screen" style="display:none">
   <div class="auth-box">
-    <h1 class="logo">eatsylog</h1>
+    <h1 class="logo"><img src="icons/logo-lockup.png" alt="eatsylog" class="logo-lockup"></h1>
+    <p class="auth-tagline">eat easy. log simply.</p>
     <p class="auth-sub">오늘도 잘 챙겨 먹었는지 확인해봐요</p>
     <form id="login-form">
       <input type="email" id="login-email" placeholder="이메일" required autocomplete="email">
@@ -37,7 +38,8 @@
 
 <div id="signup-screen" class="screen" style="display:none">
   <div class="auth-box">
-    <h1 class="logo">eatsylog</h1>
+    <h1 class="logo"><img src="icons/logo-lockup.png" alt="eatsylog" class="logo-lockup"></h1>
+    <p class="auth-tagline">eat easy. log simply.</p>
     <p class="auth-sub">계정을 만들어요</p>
     <form id="signup-form">
       <input type="email" id="signup-email" placeholder="이메일" required autocomplete="email">
@@ -51,6 +53,12 @@
 
 <!-- 메인 앱 -->
 <div id="app" class="screen" style="display:none">
+
+  <!-- 탭 상단 브랜드 자리: 작은 심볼 + 지금 탭 이름 (switchView()에서 이름을 바꿔요) -->
+  <div class="brandbar">
+    <img src="icons/logo-symbol.png" alt="" class="brand-symbol">
+    <span id="brand-title" class="brand-title">홈</span>
+  </div>
 
   <header id="topbar" class="topbar">
     <div class="topbar-date">
@@ -512,6 +520,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260930j"></script>
+<script type="module" src="js/app.js?v=20260930k"></script>
 </body>
 </html>
