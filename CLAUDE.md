@@ -154,7 +154,8 @@ users/{uid}/fcmTokens/{token}
   루트에 있어야 사이트 전체에서 동작하니 `js/` 같은 하위 폴더로 옮기지 마세요.
 - 알림은 `data.body`에 문구를 담아 보내고, 서비스워커가 그 문구 한 줄만 띄워요.
   문구를 바꾸려면 `scripts/send-reminder.js`를, 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준)과
-  `send-reminder.js`의 `slots`를 **같이** 고쳐야 해요.
+  `send-reminder.js`의 `slots`(`cron` 값)를 **같이** 고쳐야 해요. 스크립트는 어느 cron으로 실행됐는지
+  (`github.event.schedule`)를 보고 끼니를 정해요. GitHub 예약은 정각·30분에 많이 밀리니 그 시각은 피해 주세요.
 - 식약처 API 응답의 영양 필드: `AMT_NUM1`=칼로리, `AMT_NUM3`=단백질, `AMT_NUM4`=지방, `AMT_NUM6`=탄수화물.
 - 같은 종류 음식(`FOOD_REF_NM`)은 평균값 하나로 묶고, 검색어와 딱 맞거나 원재료(`DB_CLASS_CM`="01")인 것을 위로 올려요.
 - 사용자 입력을 HTML에 넣을 때는 `escapeHtml()`을 써요.
