@@ -43,7 +43,11 @@ async function main() {
     return;
   }
 
-  const tokens = tokensSnap.docs.map(d => d.data().token).filter(Boolean);
+  // 토큰과 그 토큰이 저장된 문서를 같은 순서로 묶어 둠 (실패한 토큰 문서를 지우려고)
+  const targets = tokensSnap.docs
+    .map(d => ({ ref: d.ref, token: d.data().token }))
+    .filter(t => t.token);
+  const tokens = targets.map(t => t.token);
 
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
@@ -51,7 +55,33 @@ async function main() {
   });
 
   console.log(`전송 완료: 성공 ${response.successCount} / 실패 ${response.failureCount}`);
+
+  // 실패한 토큰마다 이유를 남기고, 더 이상 쓸 수 없는 토큰은 Firestore에서 지움
+  // (저장소가 공개라 Actions 기록도 공개돼요. 토큰은 끝 6자리만 남겨요)
+  const removals = [];
+  response.responses.forEach((res, i) => {
+    if (res.success) return;
+    const code = res.error?.code || "unknown";
+    const tail = targets[i].token.slice(-6);
+    console.log(`  실패: …${tail} (${code})`);
+    if (DEAD_TOKEN_CODES.has(code)) {
+      removals.push(targets[i].ref.delete().then(() => console.log(`  삭제함: …${tail}`)));
+    }
+  });
+  await Promise.all(removals);
+
+  // 하나도 못 보냈으면 Actions를 실패(빨간색)로 표시해서 바로 알아챌 수 있게 함
+  if (response.successCount === 0) {
+    console.error("알림을 한 건도 보내지 못했어요. 앱 마이페이지에서 알림을 다시 켜 주세요.");
+    process.exitCode = 1;
+  }
 }
+
+// 기기에서 앱을 지웠거나 토큰이 바뀌어서 다시는 쓸 수 없는 토큰의 오류 코드
+const DEAD_TOKEN_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token"
+]);
 
 main().catch(err => {
   console.error("알림 전송 실패:", err);
