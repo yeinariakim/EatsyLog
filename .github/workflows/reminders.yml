@@ -1,10 +1,13 @@
 name: Meal reminders
 
+# GitHub 예약 실행은 정각·30분에 전 세계 예약이 몰려서 많이 늦어져요.
+# 그래서 붐비는 시각을 피해 목표 시각보다 몇 분 일찍 잡아 뒀어요.
+# 이 cron 문자열은 scripts/send-reminder.js의 slots와 똑같아야 해요 (어느 끼니인지 이걸로 구분해요).
 on:
   schedule:
-    - cron: "0 23 * * *"   # 08:00 KST — 아침
-    - cron: "30 2 * * *"   # 11:30 KST — 점심
-    - cron: "0 10 * * *"   # 19:00 KST — 저녁
+    - cron: "53 22 * * *"  # 07:53 KST — 아침 (08:00 목표)
+    - cron: "23 2 * * *"   # 11:23 KST — 점심 (11:30 목표)
+    - cron: "53 9 * * *"   # 18:53 KST — 저녁 (19:00 목표)
   workflow_dispatch: {}     # 수동 테스트용
 
 jobs:
@@ -19,3 +22,5 @@ jobs:
       - run: node scripts/send-reminder.js
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          # 어느 예약 때문에 실행됐는지 (수동 실행이면 비어 있음)
+          SCHEDULE: ${{ github.event.schedule }}

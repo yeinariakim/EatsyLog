@@ -125,7 +125,8 @@ PR이 `main`에 합쳐지면 바로 사이트에 반영돼요.
 3. **Actions** 탭에서 "Run workflow"를 누르면 바로 테스트할 수 있어요.
 
 알림 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준, 한국 시간 − 9시간)과
-`scripts/send-reminder.js`의 `slots`를 **같이** 고쳐야 해요. 문구도 `send-reminder.js`에서 바꿔요.
+`scripts/send-reminder.js`의 `slots`(`cron` 값)를 **같이** 고쳐야 해요. 두 cron 문자열이 똑같아야 끼니를 맞게 골라요.
+GitHub 예약은 정각·30분에 많이 밀려서, 지금은 목표 시각보다 7분 일찍(07:53 / 11:23 / 18:53) 잡아 뒀어요. 문구도 `send-reminder.js`에서 바꿔요.
 
 ## 데이터 구조 (Firestore)
 

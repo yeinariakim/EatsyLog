@@ -15,24 +15,29 @@ function getKstNow() {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000); // UTC+9, 한국은 DST 없음
 }
 
-function pickMeal() {
-  const kst = getKstNow();
-  const h = kst.getUTCHours();
-  const m = kst.getUTCMinutes();
-  const minutes = h * 60 + m;
+// 끼니별 예약. cron은 .github/workflows/reminders.yml과 똑같아야 해요.
+// (붐비는 정각·30분을 피해 목표 시각보다 몇 분 일찍 잡아 뒀어요)
+const slots = [
+  { meal: "breakfast", cron: "53 22 * * *", at: 8 * 60, emoji: "🍳", label: "아침" },
+  { meal: "lunch", cron: "23 2 * * *", at: 11 * 60 + 30, emoji: "🥪", label: "점심" },
+  { meal: "dinner", cron: "53 9 * * *", at: 19 * 60, emoji: "🌯", label: "저녁" }
+];
 
-  // 각 실행 시각과 가장 가까운 끼니를 고름 (cron 오차 몇 분은 허용)
-  const slots = [
-    { meal: "breakfast", at: 8 * 60, emoji: "🍳", label: "아침" },
-    { meal: "lunch", at: 11 * 60 + 30, emoji: "🥪", label: "점심" },
-    { meal: "dinner", at: 19 * 60, emoji: "🌯", label: "저녁" }
-  ];
-  slots.sort((a, b) => Math.abs(a.at - minutes) - Math.abs(b.at - minutes));
-  return slots[0];
+function pickMeal() {
+  // 예약 실행이면 어느 예약인지로 끼니를 정해요. GitHub가 늦게 실행해도 문구가 틀리지 않아요.
+  const schedule = (process.env.SCHEDULE || "").trim();
+  const bySchedule = slots.find(s => s.cron === schedule);
+  if (bySchedule) return bySchedule;
+
+  // 수동 실행이면 지금 시각과 가장 가까운 끼니를 골라요
+  const kst = getKstNow();
+  const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return [...slots].sort((a, b) => Math.abs(a.at - minutes) - Math.abs(b.at - minutes))[0];
 }
 
 async function main() {
   const { emoji, label } = pickMeal();
+  console.log(`예약: ${process.env.SCHEDULE || "(수동 실행)"} → ${label}`);
   const message = `${emoji} ${label}을 기록할 시간이에요!`;
 
   const db = admin.firestore();
