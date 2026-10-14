@@ -29,7 +29,7 @@ let inbodyUnsub = null;
 let allInbody = [];        // 인바디 기록 전체 (날짜순) — 집 체중계 기록(allWeights)과 따로 관리
 let editingInbodyDate = null; // 지난 인바디 기록을 고치는 중이면 그 기록의 날짜
 let weightChart;
-let inbodyCharts = []; // 인바디 지표별 작은 차트들 (다시 그릴 때 전부 destroy)
+let inbodyCharts = []; // 인바디 차트들 (실제 값 + 변화량, 다시 그릴 때 전부 destroy)
 
 // 기록에 붙이는 "양" 단위 — 그램 환산용 UNIT_PRESETS와는 별개로, 그냥 표시용 라벨이에요
 const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
@@ -1425,11 +1425,11 @@ function renderInbodyHistory() {
   });
 }
 
-// 지표 하나의 y축 범위: 최솟값·최댓값 위아래로 조금 여유를 두고, 최소 폭(2kg)은 지켜요.
+// 변화량 차트의 y축 범위: 0을 꼭 넣고, 위아래로 조금 여유를 두고, 최소 폭(2kg)은 지켜요.
 // 눈금은 폭에 따라 0.5kg 또는 1kg 단위 (폭이 아주 넓으면 2kg·5kg 단위로 넓혀요)
 const INBODY_MIN_SPAN = 2;
 function inbodyAxisRange(values) {
-  let lo = Math.min(...values), hi = Math.max(...values);
+  let lo = Math.min(0, ...values), hi = Math.max(0, ...values);
   const pad = Math.max((hi - lo) * 0.15, 0.3);
   lo -= pad; hi += pad;
   if (hi - lo < INBODY_MIN_SPAN) {
@@ -1448,74 +1448,95 @@ function formatInbodyDiff(diff) {
   return `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
 }
 
+// 두 차트의 y축 폭을 똑같이 고정해서, 같은 날짜의 점이 위아래로 줄이 맞게 해요
+const INBODY_Y_WIDTH = 40;
+
 function renderInbodyChart() {
-  const wrap = document.getElementById("inbody-charts");
-  if (!wrap || typeof Chart === "undefined") return;
+  const valueCtx = document.getElementById("inbody-chart");
+  const diffCtx = document.getElementById("inbody-diff-chart");
+  if (!valueCtx || !diffCtx || typeof Chart === "undefined") return;
   inbodyCharts.forEach(c => c.destroy());
   inbodyCharts = [];
-  wrap.innerHTML = "";
   // 기록이 2개 이상일 때만 선으로 이어 보여줘요 (기록한 날끼리만 이어요)
   const data = allInbody.slice(-20);
   document.getElementById("inbody-chart-body").style.display = data.length >= 2 ? "" : "none";
   if (data.length < 2) return;
 
   const labels = data.map(r => r.date.slice(5));
-  // 세 지표는 크기가 달라서 한 축에 그리면 작은 변화가 묻혀요. 지표마다 작은 차트를 따로 그려요
-  INBODY_METRICS.forEach((m, i) => {
-    const isLast = i === INBODY_METRICS.length - 1;
+  const series = INBODY_METRICS.map(m => {
     const values = data.map(r => (typeof r[m.key] === "number" ? r[m.key] : null));
     const present = values.filter(v => v !== null);
-    if (!present.length) return;
-    const first = present[0], latest = present[present.length - 1];
-    const range = inbodyAxisRange(present);
+    const first = present.length ? present[0] : null;
+    const latest = present.length ? present[present.length - 1] : null;
+    const diffs = values.map(v => (v === null || first === null ? null : Math.round((v - first) * 10) / 10));
+    return { ...m, values, diffs, first, latest };
+  });
+  const lineStyle = (m) => ({
+    label: m.label,
+    borderColor: m.color,
+    backgroundColor: m.color,
+    fill: false,
+    tension: 0.3,
+    pointRadius: 3,
+    spanGaps: true
+  });
 
-    const block = document.createElement("div");
-    block.className = "inbody-metric";
-    block.innerHTML = `
-      <div class="inbody-metric-head" style="color:${m.color}">
-        <span class="inbody-metric-label">${escapeHtml(m.label)}</span>
-        <span class="inbody-metric-value">${latest.toFixed(1)}kg</span>
-        <span class="inbody-metric-diff">${formatInbodyDiff(latest - first)}</span>
-      </div>
-      <div class="inbody-canvas-wrap${isLast ? " with-x" : ""}"><canvas></canvas></div>`;
-    wrap.appendChild(block);
-
-    inbodyCharts.push(new Chart(block.querySelector("canvas"), {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: m.label,
-          data: values,
-          borderColor: m.color,
-          backgroundColor: m.color,
-          fill: false,
-          tension: 0.3,
-          pointRadius: 3,
-          spanGaps: true
-        }]
+  // 위: 세 지표의 실제 값을 한 차트에 (값이 몇 kg인지 보는 용도)
+  inbodyCharts.push(new Chart(valueCtx, {
+    type: "line",
+    data: { labels, datasets: series.map(s => ({ ...lineStyle(s), data: s.values })) },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.parsed.y}kg` } }
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (c) => `${m.label} ${c.parsed.y}kg` } }
-        },
-        scales: {
-          x: { ticks: { display: isLast, font: { size: 11 } } },
-          y: {
-            min: range.min,
-            max: range.max,
-            ticks: { stepSize: range.step, font: { size: 11 }, callback: (v) => (range.step < 1 ? Number(v).toFixed(1) : String(v)) },
-            // y축 폭을 고정해서 세 차트의 선이 같은 x 위치에 맞춰지게 해요
-            afterFit: (scale) => { scale.width = 40; }
+      scales: {
+        x: { ticks: { display: false } },
+        y: { beginAtZero: false, ticks: { font: { size: 11 } }, afterFit: (scale) => { scale.width = INBODY_Y_WIDTH; } }
+      }
+    }
+  }));
+
+  // 아래: 처음 기록 대비 변화량 (세 선이 모두 0에서 출발해서 1~2kg 변화도 잘 보여요)
+  document.getElementById("inbody-diff-summary").innerHTML = series
+    .filter(s => s.first !== null)
+    .map(s => `<span style="color:${s.color}">${escapeHtml(s.label)} ${formatInbodyDiff(s.latest - s.first)}</span>`)
+    .join("");
+  const range = inbodyAxisRange(series.flatMap(s => s.diffs.filter(v => v !== null)));
+  inbodyCharts.push(new Chart(diffCtx, {
+    type: "line",
+    data: { labels, datasets: series.map(s => ({ ...lineStyle(s), data: s.diffs })) },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const actual = series[c.datasetIndex].values[c.dataIndex];
+              return `${c.dataset.label} ${formatInbodyDiff(c.parsed.y)}kg (${actual}kg)`;
+            }
           }
         }
+      },
+      scales: {
+        x: { ticks: { font: { size: 11 } } },
+        y: {
+          min: range.min,
+          max: range.max,
+          ticks: { stepSize: range.step, font: { size: 11 }, callback: (v) => (v === 0 ? "0" : formatInbodyDiff(v)) },
+          // 0(처음 기록) 선은 조금 진하게
+          grid: { color: (c) => (c.tick && c.tick.value === 0 ? "rgba(31,36,33,0.25)" : "rgba(0,0,0,0.06)") },
+          afterFit: (scale) => { scale.width = INBODY_Y_WIDTH; }
+        }
       }
-    }));
-  });
+    }
+  }));
 }
 
 // ---------- Calendar ----------
