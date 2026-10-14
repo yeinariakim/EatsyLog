@@ -494,7 +494,14 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .inbody-actions { display: flex; gap: 8px; }
 .inbody-actions .btn-primary { flex: 1; margin-top: 0; }
 .inbody-section .weight-chart-wrap { padding: 0; margin-bottom: 12px; }
-.inbody-summary { white-space: pre-line; line-height: 1.6; font-size: 12px; font-weight: 500; color: var(--accent); margin: 8px 0 0; text-align: center; }
+/* 지표별 작은 차트 (체중 → 골격근량 → 체지방량) */
+.inbody-charts { display: flex; flex-direction: column; gap: 10px; }
+.inbody-metric-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 2px; }
+.inbody-metric-label { font-weight: 600; }
+.inbody-metric-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.inbody-metric-diff { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.inbody-canvas-wrap { position: relative; height: 120px; }
+.inbody-canvas-wrap.with-x { height: 140px; } /* 맨 아래 차트는 날짜 라벨 자리만큼 더 높게 */
 .inbody-history { list-style: none; padding: 0; margin: 0; }
 .inbody-history li {
   display: flex;

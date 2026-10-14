@@ -28,7 +28,8 @@ let calendarManual = {};                      // 그 달의 수동 기록 { "YYY
 let inbodyUnsub = null;
 let allInbody = [];        // 인바디 기록 전체 (날짜순) — 집 체중계 기록(allWeights)과 따로 관리
 let editingInbodyDate = null; // 지난 인바디 기록을 고치는 중이면 그 기록의 날짜
-let weightChart, inbodyChart;
+let weightChart;
+let inbodyCharts = []; // 인바디 지표별 작은 차트들 (다시 그릴 때 전부 destroy)
 
 // 기록에 붙이는 "양" 단위 — 그램 환산용 UNIT_PRESETS와는 별개로, 그냥 표시용 라벨이에요
 const LOG_UNITS = ["g", "ml", "개", "인분", "회", "컵", "큰술", "작은술", "조각", "줌", "장"];
@@ -1424,45 +1425,97 @@ function renderInbodyHistory() {
   });
 }
 
+// 지표 하나의 y축 범위: 최솟값·최댓값 위아래로 조금 여유를 두고, 최소 폭(2kg)은 지켜요.
+// 눈금은 폭에 따라 0.5kg 또는 1kg 단위 (폭이 아주 넓으면 2kg·5kg 단위로 넓혀요)
+const INBODY_MIN_SPAN = 2;
+function inbodyAxisRange(values) {
+  let lo = Math.min(...values), hi = Math.max(...values);
+  const pad = Math.max((hi - lo) * 0.15, 0.3);
+  lo -= pad; hi += pad;
+  if (hi - lo < INBODY_MIN_SPAN) {
+    const mid = (lo + hi) / 2;
+    lo = mid - INBODY_MIN_SPAN / 2;
+    hi = mid + INBODY_MIN_SPAN / 2;
+  }
+  const span = hi - lo;
+  const step = span <= 3 ? 0.5 : span <= 6 ? 1 : span <= 12 ? 2 : 5;
+  return { min: Math.floor(lo / step) * step, max: Math.ceil(hi / step) * step, step };
+}
+
+function formatInbodyDiff(diff) {
+  const d = Math.round(diff * 10) / 10;
+  if (d === 0) return "±0.0";
+  return `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`;
+}
+
 function renderInbodyChart() {
-  const ctx = document.getElementById("inbody-chart");
-  if (!ctx || typeof Chart === "undefined") return;
-  if (inbodyChart) { inbodyChart.destroy(); inbodyChart = null; }
+  const wrap = document.getElementById("inbody-charts");
+  if (!wrap || typeof Chart === "undefined") return;
+  inbodyCharts.forEach(c => c.destroy());
+  inbodyCharts = [];
+  wrap.innerHTML = "";
   // 기록이 2개 이상일 때만 선으로 이어 보여줘요 (기록한 날끼리만 이어요)
   const data = allInbody.slice(-20);
   document.getElementById("inbody-chart-body").style.display = data.length >= 2 ? "" : "none";
   if (data.length < 2) return;
-  inbodyChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: data.map(r => r.date.slice(5)),
-      datasets: INBODY_METRICS.map(m => ({
-        label: m.label,
-        data: data.map(r => (typeof r[m.key] === "number" ? r[m.key] : null)),
-        borderColor: m.color,
-        backgroundColor: m.color,
-        fill: false,
-        tension: 0.3,
-        pointRadius: 3,
-        spanGaps: true
-      }))
-    },
-    options: {
-      interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: { labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, font: { size: 12 } } },
-        tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.parsed.y}kg` } }
-      },
-      scales: { y: { beginAtZero: false, ticks: { callback: (v) => `${v}kg` } } }
-    }
-  });
 
-  // 세 지표가 한 축을 같이 써서 작은 변화는 선으로 잘 안 보이니, 처음 → 최근 변화량을 한 줄로 같이 보여줘요
-  const first = data[0], last = data[data.length - 1];
-  document.getElementById("inbody-summary").textContent = `${first.date.slice(5)} 대비 ` + INBODY_METRICS.map(m => {
-    const diff = Math.round(((last[m.key] ?? 0) - (first[m.key] ?? 0)) * 10) / 10;
-    return `${m.label} ${diff > 0 ? "+" : ""}${formatAmount(diff)}kg`;
-  }).join(" · ");
+  const labels = data.map(r => r.date.slice(5));
+  // 세 지표는 크기가 달라서 한 축에 그리면 작은 변화가 묻혀요. 지표마다 작은 차트를 따로 그려요
+  INBODY_METRICS.forEach((m, i) => {
+    const isLast = i === INBODY_METRICS.length - 1;
+    const values = data.map(r => (typeof r[m.key] === "number" ? r[m.key] : null));
+    const present = values.filter(v => v !== null);
+    if (!present.length) return;
+    const first = present[0], latest = present[present.length - 1];
+    const range = inbodyAxisRange(present);
+
+    const block = document.createElement("div");
+    block.className = "inbody-metric";
+    block.innerHTML = `
+      <div class="inbody-metric-head" style="color:${m.color}">
+        <span class="inbody-metric-label">${escapeHtml(m.label)}</span>
+        <span class="inbody-metric-value">${latest.toFixed(1)}kg</span>
+        <span class="inbody-metric-diff">${formatInbodyDiff(latest - first)}</span>
+      </div>
+      <div class="inbody-canvas-wrap${isLast ? " with-x" : ""}"><canvas></canvas></div>`;
+    wrap.appendChild(block);
+
+    inbodyCharts.push(new Chart(block.querySelector("canvas"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: m.label,
+          data: values,
+          borderColor: m.color,
+          backgroundColor: m.color,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 3,
+          spanGaps: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => `${m.label} ${c.parsed.y}kg` } }
+        },
+        scales: {
+          x: { ticks: { display: isLast, font: { size: 11 } } },
+          y: {
+            min: range.min,
+            max: range.max,
+            ticks: { stepSize: range.step, font: { size: 11 }, callback: (v) => (range.step < 1 ? Number(v).toFixed(1) : String(v)) },
+            // y축 폭을 고정해서 세 차트의 선이 같은 x 위치에 맞춰지게 해요
+            afterFit: (scale) => { scale.width = 40; }
+          }
+        }
+      }
+    }));
+  });
 }
 
 // ---------- Calendar ----------
