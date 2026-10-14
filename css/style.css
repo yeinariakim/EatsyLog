@@ -494,7 +494,13 @@ select, textarea { font-family: var(--font); font-size: 16px; }
 .inbody-actions { display: flex; gap: 8px; }
 .inbody-actions .btn-primary { flex: 1; margin-top: 0; }
 .inbody-section .weight-chart-wrap { padding: 0; margin-bottom: 12px; }
-.inbody-summary { white-space: pre-line; line-height: 1.6; font-size: 12px; font-weight: 500; color: var(--accent); margin: 8px 0 0; text-align: center; }
+/* 인바디 차트: 위는 실제 값, 아래는 처음 대비 변화량 */
+.inbody-canvas-wrap { position: relative; }
+.inbody-canvas-wrap.values { height: 190px; }
+.inbody-canvas-wrap.diff { height: 160px; }
+.inbody-diff-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 4px; font-size: 13px; }
+.inbody-diff-title { font-weight: 600; color: var(--text-soft); }
+.inbody-diff-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .inbody-history { list-style: none; padding: 0; margin: 0; }
 .inbody-history li {
   display: flex;

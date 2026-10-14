@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=20260930l">
+<link rel="stylesheet" href="css/style.css?v=20261014b">
 </head>
 <body>
 
@@ -206,8 +206,12 @@
         </div>
       </form>
       <div id="inbody-chart-body" class="weight-chart-wrap" style="display:none">
-        <canvas id="inbody-chart"></canvas>
-        <p id="inbody-summary" class="inbody-summary"></p>
+        <div class="inbody-canvas-wrap values"><canvas id="inbody-chart"></canvas></div>
+        <div class="inbody-diff-head">
+          <span class="inbody-diff-title">처음 대비 변화량</span>
+          <span id="inbody-diff-summary" class="inbody-diff-summary"></span>
+        </div>
+        <div class="inbody-canvas-wrap diff"><canvas id="inbody-diff-chart"></canvas></div>
       </div>
       <ul id="inbody-history" class="inbody-history"></ul>
     </section>
@@ -447,6 +451,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20260930l"></script>
+<script type="module" src="js/app.js?v=20261014b"></script>
 </body>
 </html>
