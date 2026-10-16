@@ -153,8 +153,10 @@ users/{uid}/favorites/{자동ID}                    즐겨찾기
   defaultAmount, extras
 
 users/{uid}/fcmTokens/{토큰}                      알림 받을 기기
-reminderLog/{날짜}_{끼니}                          식사 알림 보낸 기록 (서버 스크립트만 씀)
   token, updatedAt
+
+reminderLog/{날짜}_{끼니}                          식사 알림 보낸 기록 (서버 스크립트만 씀)
+  date, meal, sentAt
 ```
 
 새 컬렉션을 만들면 `firestore.rules`에도 규칙을 꼭 추가해 주세요.
