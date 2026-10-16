@@ -121,12 +121,12 @@ PR이 `main`에 합쳐지면 바로 사이트에 반영돼요.
 1. 저장소 **Settings > Secrets and variables > Actions > New repository secret**에서
    - 이름: `FIREBASE_SERVICE_ACCOUNT`
    - 값: 2-6번에서 받은 JSON 파일 내용 전체
-2. `.github/workflows/reminders.yml`이 매일 08:00 / 11:30 / 19:00(한국 시간)에 알아서 실행돼요.
+2. `.github/workflows/reminders.yml`이 15분마다 실행되고, 08:00 / 11:30 / 19:00(한국 시간)이 지나면 끼니마다 한 번씩 알림을 보내요.
 3. **Actions** 탭에서 "Run workflow"를 누르면 바로 테스트할 수 있어요.
 
-알림 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준, 한국 시간 − 9시간)과
-`scripts/send-reminder.js`의 `slots`(`cron` 값)를 **같이** 고쳐야 해요. 두 cron 문자열이 똑같아야 끼니를 맞게 골라요.
-GitHub 예약은 정각·30분에 많이 밀려서, 지금은 목표 시각보다 7분 일찍(07:53 / 11:23 / 18:53) 잡아 뒀어요. 문구도 `send-reminder.js`에서 바꿔요.
+알림 시간과 문구는 `scripts/send-reminder.js`의 `slots`에서 바꿔요 (한국 시간 기준).
+GitHub 예약 실행은 몇 시간씩 늦어질 때가 있어서, 15분마다 실행해 두고 끼니 시간이 지난 뒤 처음 도착한 실행이 알림을 보내요.
+보낸 끼니는 Firestore `reminderLog`에 남겨서 두 번 가지 않아요.
 
 ## 데이터 구조 (Firestore)
 
@@ -154,6 +154,9 @@ users/{uid}/favorites/{자동ID}                    즐겨찾기
 
 users/{uid}/fcmTokens/{토큰}                      알림 받을 기기
   token, updatedAt
+
+reminderLog/{날짜}_{끼니}                          식사 알림 보낸 기록 (서버 스크립트만 씀)
+  date, meal, sentAt
 ```
 
 새 컬렉션을 만들면 `firestore.rules`에도 규칙을 꼭 추가해 주세요.

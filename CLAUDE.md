@@ -64,8 +64,8 @@ js/
   nutrition-api.js       식약처 API 검색, 결과 묶기/정렬, 100g 기준 → 실제 양 환산
   units.js               "1그릇=250g" 같은 단위 프리셋, 음식 이름으로 기본 단위 추측
   notifications.js       알림 권한 받기 + 이 기기의 FCM 토큰을 Firestore에 저장
-scripts/send-reminder.js GitHub Actions에서 실행. 모든 기기 토큰에 식사 알림 전송
-.github/workflows/reminders.yml  매일 08:00 / 11:30 / 19:00 (KST) 실행
+scripts/send-reminder.js GitHub Actions에서 실행. 끼니 시간이 지났으면 모든 기기 토큰에 식사 알림 전송
+.github/workflows/reminders.yml  15분마다 실행 (알림은 08:00 / 11:30 / 19:00 KST 끼니마다 하루 한 번)
 ```
 
 ## 동작 흐름 (쉽게)
@@ -142,6 +142,10 @@ users/{uid}/manualDayStatus/{date}   달력 수동 기록 (문서 ID = 날짜, �
 
 users/{uid}/fcmTokens/{token}
   token, updatedAt
+
+reminderLog/{YYYY-MM-DD}_{meal}      식사 알림을 보냈다는 기록 (서버 스크립트만 씀, 하루 끼니당 한 번만 보내려고)
+  date, meal, sentAt
+  (앱에서는 읽지도 쓰지도 않아서 규칙이 없어요. 규칙에 없는 경로는 기본으로 막혀 있어요)
 ```
 
 새 컬렉션을 추가하면 `firestore.rules`에도 규칙을 꼭 추가해야 해요. (PR 설명 쓰는 법은 위 "작업 규칙" 참고)
@@ -153,9 +157,10 @@ users/{uid}/fcmTokens/{token}
 - **서비스워커는 저장소 루트의 `firebase-messaging-sw.js`** 예요 (`notifications.js`에서 등록).
   루트에 있어야 사이트 전체에서 동작하니 `js/` 같은 하위 폴더로 옮기지 마세요.
 - 알림은 `data.body`에 문구를 담아 보내고, 서비스워커가 그 문구 한 줄만 띄워요.
-  문구를 바꾸려면 `scripts/send-reminder.js`를, 시간을 바꾸려면 `reminders.yml`의 cron(UTC 기준)과
-  `send-reminder.js`의 `slots`(`cron` 값)를 **같이** 고쳐야 해요. 스크립트는 어느 cron으로 실행됐는지
-  (`github.event.schedule`)를 보고 끼니를 정해요. GitHub 예약은 정각·30분에 많이 밀리니 그 시각은 피해 주세요.
+  문구와 끼니 시간은 `scripts/send-reminder.js`의 `slots`에서 바꿔요. `reminders.yml`은 15분마다 실행만 해요.
+  GitHub 예약 실행은 몇 시간씩 늦어질 때가 있어서, 자주 실행해 두고 끼니 시간이 지난 뒤 처음 도착한 실행이 보내는 방식이에요.
+  보낸 끼니는 `reminderLog`에 남겨서 두 번 가지 않고, 다음 끼니 시간(저녁은 자정)이 되면 지난 끼니는 더 보내지 않아요.
+  Actions에서 직접 실행(Run workflow)하면 기록 없이 지금 시각과 가까운 끼니 알림을 바로 보내요 (테스트용).
 - 식약처 API 응답의 영양 필드: `AMT_NUM1`=칼로리, `AMT_NUM3`=단백질, `AMT_NUM4`=지방, `AMT_NUM6`=탄수화물.
 - 같은 종류 음식(`FOOD_REF_NM`)은 평균값 하나로 묶고, 검색어와 딱 맞거나 원재료(`DB_CLASS_CM`="01")인 것을 위로 올려요.
 - 사용자 입력을 HTML에 넣을 때는 `escapeHtml()`을 써요.
