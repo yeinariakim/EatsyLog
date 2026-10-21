@@ -159,7 +159,7 @@ reminderLog/{YYYY-MM-DD}_{meal}      식사 알림을 보냈다는 기록 (서�
 - 알림은 `data.body`에 문구를 담아 보내고, 서비스워커가 그 문구 한 줄만 띄워요.
   문구와 끼니 시간은 `scripts/send-reminder.js`의 `slots`에서 바꿔요. `reminders.yml`은 15분마다 실행만 해요.
   GitHub 예약 실행은 몇 시간씩 늦어질 때가 있어서, 자주 실행해 두고 끼니 시간이 지난 뒤 처음 도착한 실행이 보내는 방식이에요.
-  보낸 끼니는 `reminderLog`에 남겨서 두 번 가지 않고, 다음 끼니 시간(저녁은 자정)이 되면 지난 끼니는 더 보내지 않아요.
+  보낸 끼니는 `reminderLog`에 남겨서 두 번 가지 않고, 끼니 시간보다 90분(`MAX_LATE_MINUTES`) 넘게 늦으면 그 끼니 알림은 보내지 않아요.
   Actions에서 직접 실행(Run workflow)하면 기록 없이 지금 시각과 가까운 끼니 알림을 바로 보내요 (테스트용).
 - 식약처 API 응답의 영양 필드: `AMT_NUM1`=칼로리, `AMT_NUM3`=단백질, `AMT_NUM4`=지방, `AMT_NUM6`=탄수화물.
 - 같은 종류 음식(`FOOD_REF_NM`)은 평균값 하나로 묶고, 검색어와 딱 맞거나 원재료(`DB_CLASS_CM`="01")인 것을 위로 올려요.

@@ -22,6 +22,9 @@ const slots = [
   { meal: "dinner", at: 19 * 60, emoji: "🌯", label: "저녁" }
 ];
 
+// 끼니 시간보다 이만큼(분) 넘게 늦으면 그 끼니 알림은 보내지 않아요 (늦은 알림은 오히려 방해라서)
+const MAX_LATE_MINUTES = 90;
+
 // 기기에서 앱을 지웠거나 토큰이 바뀌어서 다시는 쓸 수 없는 토큰의 오류 코드
 const DEAD_TOKEN_CODES = new Set([
   "messaging/registration-token-not-registered",
@@ -69,6 +72,11 @@ async function main() {
       console.log(`지금(${now.date} KST ${fmt(now.minutes)})은 보낼 끼니가 없어요.`);
       return;
     }
+    const delay = now.minutes - slot.at;
+    if (delay > MAX_LATE_MINUTES) {
+      console.log(`${now.date} ${slot.label} 알림은 ${delay}분 늦어서 보내지 않아요 (${MAX_LATE_MINUTES}분까지만 보냄).`);
+      return;
+    }
     // create()는 문서가 이미 있으면 실패해요 → 같은 끼니를 두 번 보내지 않음 (동시에 실행돼도 안전)
     logRef = db.collection("reminderLog").doc(`${now.date}_${slot.meal}`);
     try {
@@ -84,7 +92,6 @@ async function main() {
       }
       throw err;
     }
-    const delay = now.minutes - slot.at;
     console.log(`${now.date} ${slot.label} 알림 보내요 (끼니 시간 ${fmt(slot.at)}, ${delay}분 뒤)`);
   }
 

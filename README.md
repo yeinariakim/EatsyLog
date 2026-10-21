@@ -126,7 +126,7 @@ PR이 `main`에 합쳐지면 바로 사이트에 반영돼요.
 
 알림 시간과 문구는 `scripts/send-reminder.js`의 `slots`에서 바꿔요 (한국 시간 기준).
 GitHub 예약 실행은 몇 시간씩 늦어질 때가 있어서, 15분마다 실행해 두고 끼니 시간이 지난 뒤 처음 도착한 실행이 알림을 보내요.
-보낸 끼니는 Firestore `reminderLog`에 남겨서 두 번 가지 않아요.
+보낸 끼니는 Firestore `reminderLog`에 남겨서 두 번 가지 않고, 끼니 시간보다 90분 넘게 늦으면 그 끼니 알림은 보내지 않아요.
 
 ## 데이터 구조 (Firestore)
 
