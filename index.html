@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#FAFAF8">
 <link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=20261119a">
+<link rel="stylesheet" href="css/style.css?v=20261119b">
 </head>
 <body>
 
@@ -186,7 +186,11 @@
       <button type="submit" class="btn-primary">기록</button>
     </form>
     <div class="weight-chart-wrap">
-      <!-- 전체 기록을 그리고, 처음엔 최근 한 달이 보이게 오른쪽 끝으로 스크롤해요. y축은 왼쪽에 고정 -->
+      <!-- 처음엔 최근 8주 주간 평균. "전체 추이 보기"를 누르면 전체 기록을 옆으로 밀어서 봐요 (y축은 왼쪽에 고정) -->
+      <div class="weight-chart-head">
+        <span id="weight-chart-title" class="weight-chart-title">최근 8주 · 주간 평균</span>
+        <button type="button" id="weight-chart-toggle" class="weight-chart-toggle">전체 추이 보기</button>
+      </div>
       <div class="weight-scroll-outer">
         <div id="weight-scroll" class="weight-scroll">
           <div id="weight-scroll-inner" class="weight-scroll-inner"><canvas id="weight-chart"></canvas></div>
@@ -457,6 +461,6 @@
 <script type="module" src="js/units.js"></script>
 <script type="module" src="js/nutrition-api.js"></script>
 <!-- 코드를 바꾸면 ?v= 값도 바꿔 주세요 (휴대폰이 예전 파일을 계속 쓰지 않도록) -->
-<script type="module" src="js/app.js?v=20261119a"></script>
+<script type="module" src="js/app.js?v=20261119b"></script>
 </body>
 </html>
