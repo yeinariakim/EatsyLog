@@ -1295,9 +1295,37 @@ function renderWeightHistory() {
   `).join("");
 }
 
-// 체중 그래프: 전체 기록을 날짜 간격 그대로 그리고, 화면에는 한 번에 약 한 달(30일)만 보여요.
-// 그래프가 화면보다 넓으면 옆으로 밀어서 지난 기록을 봐요. 처음엔 오른쪽 끝(최근)에서 시작해요.
+// 체중 그래프는 두 가지로 볼 수 있어요.
+// - "recent"(기본): 최근 8주를 1주일씩 묶은 평균값 8개. 오늘을 포함한 7일이 마지막 주예요.
+// - "all": 전체 기록을 날짜 간격 그대로 그리고, 화면에는 한 번에 약 한 달(30일)만 보여요.
+//   그래프가 화면보다 넓으면 옆으로 밀어서 지난 기록을 봐요. 처음엔 오른쪽 끝(최근)에서 시작해요.
 const WEIGHT_VISIBLE_DAYS = 30;
+const WEIGHT_RECENT_WEEKS = 8;
+let weightChartMode = "recent";
+
+document.getElementById("weight-chart-toggle").addEventListener("click", () => {
+  weightChartMode = weightChartMode === "recent" ? "all" : "recent";
+  renderWeightChart();
+});
+
+// 최근 8주 주간 평균. 기록이 없는 주는 null (선은 건너뛰어 이어요)
+function weeklyWeightAverages() {
+  const todayIdx = dayIndex(todayStr());
+  const weeks = [];
+  for (let i = WEIGHT_RECENT_WEEKS - 1; i >= 0; i--) {
+    const end = todayIdx - i * 7;
+    const start = end - 6;
+    const kgs = allWeights.filter(w => { const d = dayIndex(w.date); return d >= start && d <= end; }).map(w => w.kg);
+    const avg = kgs.length ? Math.round(kgs.reduce((a, b) => a + b, 0) / kgs.length * 10) / 10 : null;
+    weeks.push({ start, end, avg, count: kgs.length });
+  }
+  return weeks;
+}
+
+function shortDate(idx) {
+  const [, m, d] = dateFromDayIndex(idx).split("-").map(Number);
+  return `${m}/${d}`;
+}
 
 function dayIndex(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -1335,6 +1363,12 @@ function renderWeightChart() {
   if (!ctx || !scroller || typeof Chart === "undefined") return;
   const viewWidth = scroller.clientWidth;
   if (!viewWidth) return; // 체중 탭이 숨겨져 있으면 탭을 열 때 다시 그려요
+
+  const recent = weightChartMode === "recent";
+  document.getElementById("weight-chart-title").textContent = recent ? "최근 8주 · 주간 평균" : "전체 추이";
+  document.getElementById("weight-chart-toggle").textContent = recent ? "전체 추이 보기" : "최근 값 보기";
+  document.getElementById("weight-yaxis").style.display = recent ? "none" : "";
+  if (recent) { renderWeeklyWeightChart(ctx, inner); return; }
 
   const points = allWeights.map(w => ({ x: dayIndex(w.date), y: w.kg }));
   const first = points.length ? points[0].x : 0;
@@ -1394,6 +1428,46 @@ function renderWeightChart() {
     plugins: [stickyYAxisPlugin]
   });
   scroller.scrollLeft = scroller.scrollWidth; // 최근 기록부터 보이게
+}
+
+function renderWeeklyWeightChart(ctx, inner) {
+  const weeks = weeklyWeightAverages();
+  inner.style.width = ""; // 화면 폭에 맞춰요 (스크롤 없음)
+  if (weightChart) weightChart.destroy();
+  weightChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: weeks.map(w => shortDate(w.start) + "~"),
+      datasets: [{
+        data: weeks.map(w => w.avg),
+        borderColor: "#5B7B6C",
+        backgroundColor: "rgba(91,123,108,0.08)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        cubicInterpolationMode: "monotone", // 점 사이 곡선이 실제 값보다 튀지 않게
+        spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => { const w = weeks[items[0].dataIndex]; return `${shortDate(w.start)} ~ ${shortDate(w.end)}`; },
+            label: (item) => `평균 ${item.parsed.y}kg (${weeks[item.dataIndex].count}일 기록)`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false, font: { size: 10 } } },
+        y: { beginAtZero: false }
+      }
+    }
+  });
 }
 
 // ---------- InBody (인바디) ----------

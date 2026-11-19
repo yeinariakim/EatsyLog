@@ -464,6 +464,9 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   margin-bottom: 16px;
 }
 /* 체중 그래프: 옆으로 슬라이드 (y축은 고정 캔버스로 덮어 그려요) */
+.weight-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.weight-chart-title { font-weight: 600; color: var(--text-soft); }
+.weight-chart-toggle { background: none; border: none; padding: 4px 0; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 .weight-scroll-outer { position: relative; }
 .weight-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .weight-scroll::-webkit-scrollbar { display: none; }
