@@ -1295,17 +1295,60 @@ function renderWeightHistory() {
   `).join("");
 }
 
+// 체중 그래프: 전체 기록을 날짜 간격 그대로 그리고, 화면에는 한 번에 약 한 달(30일)만 보여요.
+// 그래프가 화면보다 넓으면 옆으로 밀어서 지난 기록을 봐요. 처음엔 오른쪽 끝(최근)에서 시작해요.
+const WEIGHT_VISIBLE_DAYS = 30;
+
+function dayIndex(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function dateFromDayIndex(idx) {
+  return new Date(idx * 86400000).toISOString().slice(0, 10);
+}
+
+// 스크롤해도 y축이 남아 있도록, 그래프의 y축 부분을 왼쪽 고정 캔버스에 그대로 옮겨 그려요
+const stickyYAxisPlugin = {
+  id: "stickyYAxis",
+  afterRender(chart) {
+    const yCanvas = document.getElementById("weight-yaxis");
+    if (!yCanvas) return;
+    const ratio = chart.currentDevicePixelRatio || 1;
+    const w = Math.ceil(chart.scales.y.right) + 2;
+    const h = chart.height;
+    yCanvas.width = w * ratio;
+    yCanvas.height = h * ratio;
+    yCanvas.style.width = w + "px";
+    yCanvas.style.height = h + "px";
+    const c = yCanvas.getContext("2d");
+    c.fillStyle = "#fff";
+    c.fillRect(0, 0, yCanvas.width, yCanvas.height);
+    c.drawImage(chart.canvas, 0, 0, w * ratio, h * ratio, 0, 0, w * ratio, h * ratio);
+  }
+};
+
 function renderWeightChart() {
   const ctx = document.getElementById("weight-chart");
-  if (!ctx || typeof Chart === "undefined") return;
-  const data = allWeights.slice(-30);
+  const scroller = document.getElementById("weight-scroll");
+  const inner = document.getElementById("weight-scroll-inner");
+  if (!ctx || !scroller || typeof Chart === "undefined") return;
+  const viewWidth = scroller.clientWidth;
+  if (!viewWidth) return; // 체중 탭이 숨겨져 있으면 탭을 열 때 다시 그려요
+
+  const points = allWeights.map(w => ({ x: dayIndex(w.date), y: w.kg }));
+  const first = points.length ? points[0].x : 0;
+  const last = points.length ? points[points.length - 1].x : 0;
+  const span = Math.max(last - first, 1);
+  // 30일보다 길면 그 비율만큼 그래프를 넓혀요
+  inner.style.width = Math.round(viewWidth * Math.max(1, span / WEIGHT_VISIBLE_DAYS)) + "px";
+
   if (weightChart) weightChart.destroy();
   weightChart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: data.map(w => w.date.slice(5)),
       datasets: [{
-        data: data.map(w => w.kg),
+        data: points,
         borderColor: "#5B7B6C",
         backgroundColor: "rgba(91,123,108,0.08)",
         fill: true,
@@ -1314,10 +1357,43 @@ function renderWeightChart() {
       }]
     },
     options: {
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: false } }
-    }
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => dateFromDayIndex(items[0].parsed.x).slice(5),
+            label: (item) => `${item.parsed.y}kg`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: "linear",
+          min: first - 0.5,          // 양 끝 점이 잘리지 않게 반나절씩 여유
+          max: first + span + 0.5,
+          grid: { display: false },
+          // 눈금은 하루 단위(정수)로만 두고, 겹치면 Chart.js가 알아서 건너뛰어요
+          afterBuildTicks: (scale) => {
+            const ticks = [];
+            for (let v = Math.ceil(scale.min); v <= Math.floor(scale.max); v++) ticks.push({ value: v });
+            scale.ticks = ticks;
+          },
+          ticks: {
+            autoSkip: true,
+            autoSkipPadding: 12,
+            maxRotation: 0,
+            callback: (v) => Number.isInteger(v) ? dateFromDayIndex(v).slice(5) : ""
+          }
+        },
+        y: { beginAtZero: false }
+      }
+    },
+    plugins: [stickyYAxisPlugin]
   });
+  scroller.scrollLeft = scroller.scrollWidth; // 최근 기록부터 보이게
 }
 
 // ---------- InBody (인바디) ----------
