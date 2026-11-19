@@ -463,6 +463,12 @@ select, textarea { font-family: var(--font); font-size: 16px; }
   padding: 12px;
   margin-bottom: 16px;
 }
+/* 체중 그래프: 옆으로 슬라이드 (y축은 고정 캔버스로 덮어 그려요) */
+.weight-scroll-outer { position: relative; }
+.weight-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.weight-scroll::-webkit-scrollbar { display: none; }
+.weight-scroll-inner { position: relative; height: 200px; min-width: 100%; }
+.weight-yaxis { position: absolute; left: 0; top: 0; pointer-events: none; }
 .weight-history { list-style: none; padding: 0; margin: 0; }
 .weight-history li {
   display: flex;
